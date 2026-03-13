@@ -1,0 +1,56 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CRM{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <aside class="sidebar">
+        <a href="{% url 'dashboard' %}" class="sidebar-brand">&#9670; CRM</a>
+        <nav class="sidebar-nav">
+            <a href="{% url 'dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}class="active"{% endif %}>
+                &#9632; Dashboard
+            </a>
+            <div class="nav-section">Sales</div>
+            <a href="{% url 'deal_list' %}" {% if 'deal' in request.resolver_match.url_name %}class="active"{% endif %}>
+                &#11044; Deals
+            </a>
+            <div class="nav-section">People</div>
+            <a href="{% url 'contact_list' %}" {% if 'contact' in request.resolver_match.url_name %}class="active"{% endif %}>
+                &#9786; Contacts
+            </a>
+            <a href="{% url 'company_list' %}" {% if 'company' in request.resolver_match.url_name %}class="active"{% endif %}>
+                &#127970; Companies
+            </a>
+            <div class="nav-section">Track</div>
+            <a href="{% url 'activity_list' %}" {% if 'activity' in request.resolver_match.url_name %}class="active"{% endif %}>
+                &#128337; Activities
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            Signed in as <strong>{{ request.user.username }}</strong><br>
+            <a href="{% url 'logout' %}">Sign out</a>
+        </div>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <span class="topbar-title">{% block page_title %}{% endblock %}</span>
+            <div>{% block topbar_actions %}{% endblock %}</div>
+        </header>
+
+        <div class="content">
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,42 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Activities - CRM{% endblock %}
+{% block page_title %}Activities{% endblock %}
+{% block topbar_actions %}
+    <a href="{% url 'activity_create' %}" class="btn btn-primary">+ Log Activity</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="padding:0;">
+    {% if activities %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Type</th><th>Subject</th><th>Contact</th><th>Deal</th><th>Due</th><th>Done</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for activity in activities %}
+                    <tr>
+                        <td>{{ activity.get_type_display }}</td>
+                        <td>{{ activity.subject }}</td>
+                        <td>{% if activity.contact %}<a href="{% url 'contact_detail' activity.contact.pk %}">{{ activity.contact.full_name }}</a>{% else %}-{% endif %}</td>
+                        <td>{% if activity.deal %}<a href="{% url 'deal_detail' activity.deal.pk %}">{{ activity.deal }}</a>{% else %}-{% endif %}</td>
+                        <td>{{ activity.due_date|date:"M d, Y H:i"|default:"-" }}</td>
+                        <td>{% if activity.completed %}&#10003;{% else %}&#8212;{% endif %}</td>
+                        <td>
+                            <a href="{% url 'activity_edit' activity.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+                            <a href="{% url 'activity_delete' activity.pk %}" class="btn btn-danger btn-sm">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty">
+            <p>No activities logged yet.</p>
+            <a href="{% url 'activity_create' %}" class="btn btn-primary">Log your first activity</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

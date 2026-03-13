@@ -1,0 +1,75 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Dashboard - CRM{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Contacts</div>
+        <div class="stat-value">{{ contacts_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Companies</div>
+        <div class="stat-value">{{ companies_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Deals</div>
+        <div class="stat-value">{{ deals_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Won Revenue</div>
+        <div class="stat-value">${{ total_value|floatformat:0 }}</div>
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+    <div class="card">
+        <div class="card-title">Recent Deals</div>
+        {% if recent_deals %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Title</th><th>Stage</th><th>Value</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for deal in recent_deals %}
+                        <tr>
+                            <td><a href="{% url 'deal_detail' deal.pk %}">{{ deal.title }}</a></td>
+                            <td><span class="badge badge-{{ deal.stage }}">{{ deal.get_stage_display }}</span></td>
+                            <td>${{ deal.value|floatformat:0 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty"><p>No deals yet.</p><a href="{% url 'deal_create' %}" class="btn btn-primary">New Deal</a></div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-title">Recent Activities</div>
+        {% if recent_activities %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Type</th><th>Subject</th><th>Contact</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for activity in recent_activities %}
+                        <tr>
+                            <td>{{ activity.get_type_display }}</td>
+                            <td>{{ activity.subject }}</td>
+                            <td>{% if activity.contact %}{{ activity.contact.full_name }}{% else %}-{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty"><p>No activities yet.</p><a href="{% url 'activity_create' %}" class="btn btn-primary">Log Activity</a></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

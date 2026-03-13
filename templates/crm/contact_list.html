@@ -1,0 +1,49 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Contacts - CRM{% endblock %}
+{% block page_title %}Contacts{% endblock %}
+{% block topbar_actions %}
+    <a href="{% url 'contact_create' %}" class="btn btn-primary">+ New Contact</a>
+{% endblock %}
+
+{% block content %}
+<div class="search-bar">
+    <form method="get" style="display:flex;gap:8px;flex:1;">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search contacts...">
+        <button type="submit" class="btn btn-secondary">Search</button>
+        {% if q %}<a href="{% url 'contact_list' %}" class="btn btn-secondary">Clear</a>{% endif %}
+    </form>
+</div>
+
+<div class="card" style="padding:0;">
+    {% if contacts %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Title</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for contact in contacts %}
+                    <tr>
+                        <td><a href="{% url 'contact_detail' contact.pk %}"><strong>{{ contact.full_name }}</strong></a></td>
+                        <td>{{ contact.email|default:"-" }}</td>
+                        <td>{{ contact.phone|default:"-" }}</td>
+                        <td>{% if contact.company %}<a href="{% url 'company_detail' contact.company.pk %}">{{ contact.company }}</a>{% else %}-{% endif %}</td>
+                        <td>{{ contact.job_title|default:"-" }}</td>
+                        <td>
+                            <a href="{% url 'contact_edit' contact.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+                            <a href="{% url 'contact_delete' contact.pk %}" class="btn btn-danger btn-sm">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty">
+            <p>No contacts found.</p>
+            <a href="{% url 'contact_create' %}" class="btn btn-primary">Create your first contact</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

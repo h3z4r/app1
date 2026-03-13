@@ -1,0 +1,79 @@
+{% extends "crm/base.html" %}
+
+{% block title %}{{ company.name }} - CRM{% endblock %}
+{% block page_title %}Company Detail{% endblock %}
+{% block topbar_actions %}
+    <a href="{% url 'company_edit' company.pk %}" class="btn btn-secondary">Edit</a>
+    <a href="{% url 'company_delete' company.pk %}" class="btn btn-danger">Delete</a>
+{% endblock %}
+
+{% block content %}
+<div class="detail-grid">
+    <div>
+        <div class="card">
+            <div class="card-title">{{ company.name }}</div>
+            <div class="detail-field">
+                <div class="label">Industry</div>
+                <div class="value">{{ company.industry|default:"-" }}</div>
+            </div>
+            <div class="detail-field">
+                <div class="label">Website</div>
+                <div class="value">{% if company.website %}<a href="{{ company.website }}" target="_blank">{{ company.website }}</a>{% else %}-{% endif %}</div>
+            </div>
+            <div class="detail-field">
+                <div class="label">Phone</div>
+                <div class="value">{{ company.phone|default:"-" }}</div>
+            </div>
+            <div class="detail-field">
+                <div class="label">Email</div>
+                <div class="value">{{ company.email|default:"-" }}</div>
+            </div>
+            <div class="detail-field">
+                <div class="label">Address</div>
+                <div class="value">{{ company.address|default:"-" }}</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Contacts</div>
+            {% if company.contacts.all %}
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Name</th><th>Title</th><th>Email</th></tr></thead>
+                        <tbody>
+                            {% for contact in company.contacts.all %}
+                            <tr>
+                                <td><a href="{% url 'contact_detail' contact.pk %}">{{ contact.full_name }}</a></td>
+                                <td>{{ contact.job_title|default:"-" }}</td>
+                                <td>{{ contact.email|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p style="color:var(--text-muted);font-size:0.9rem;">No contacts linked.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div>
+        <div class="card">
+            <div class="card-title">Deals</div>
+            {% if company.deals.all %}
+                {% for deal in company.deals.all %}
+                    <div style="padding:10px 0;border-bottom:1px solid var(--border);">
+                        <a href="{% url 'deal_detail' deal.pk %}">{{ deal.title }}</a>
+                        <div style="margin-top:4px;">
+                            <span class="badge badge-{{ deal.stage }}">{{ deal.get_stage_display }}</span>
+                            <span style="font-size:0.85rem;color:var(--text-muted);margin-left:8px;">${{ deal.value|floatformat:0 }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p style="color:var(--text-muted);font-size:0.9rem;">No deals linked.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

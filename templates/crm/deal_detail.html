@@ -1,0 +1,62 @@
+{% extends "crm/base.html" %}
+
+{% block title %}{{ deal.title }} - CRM{% endblock %}
+{% block page_title %}Deal Detail{% endblock %}
+{% block topbar_actions %}
+    <a href="{% url 'deal_edit' deal.pk %}" class="btn btn-secondary">Edit</a>
+    <a href="{% url 'deal_delete' deal.pk %}" class="btn btn-danger">Delete</a>
+{% endblock %}
+
+{% block content %}
+<div class="detail-grid">
+    <div>
+        <div class="card">
+            <div class="card-title">{{ deal.title }}</div>
+            <div style="margin-bottom:16px;">
+                <span class="badge badge-{{ deal.stage }}" style="font-size:0.9rem;padding:6px 16px;">{{ deal.get_stage_display }}</span>
+            </div>
+            <div class="detail-field">
+                <div class="label">Value</div>
+                <div class="value" style="font-size:1.5rem;font-weight:700;color:var(--primary);">${{ deal.value|floatformat:2 }}</div>
+            </div>
+            <div class="detail-field">
+                <div class="label">Contact</div>
+                <div class="value">{% if deal.contact %}<a href="{% url 'contact_detail' deal.contact.pk %}">{{ deal.contact.full_name }}</a>{% else %}-{% endif %}</div>
+            </div>
+            <div class="detail-field">
+                <div class="label">Company</div>
+                <div class="value">{% if deal.company %}<a href="{% url 'company_detail' deal.company.pk %}">{{ deal.company }}</a>{% else %}-{% endif %}</div>
+            </div>
+            <div class="detail-field">
+                <div class="label">Expected Close Date</div>
+                <div class="value">{{ deal.close_date|default:"-" }}</div>
+            </div>
+            {% if deal.notes %}
+            <div class="detail-field">
+                <div class="label">Notes</div>
+                <div class="value">{{ deal.notes }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div>
+        <div class="card">
+            <div class="card-title">Activities</div>
+            {% if deal.activities.all %}
+                {% for activity in deal.activities.all %}
+                    <div style="padding:10px 0;border-bottom:1px solid var(--border);">
+                        <div style="font-size:0.8rem;color:var(--text-muted);">{{ activity.get_type_display }} &middot; {{ activity.created_at|date:"M d, Y" }}</div>
+                        <div style="font-size:0.9rem;margin-top:4px;">{{ activity.subject }}</div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p style="color:var(--text-muted);font-size:0.9rem;">No activities yet.</p>
+            {% endif %}
+            <div style="margin-top:12px;">
+                <a href="{% url 'activity_create' %}" class="btn btn-secondary btn-sm">+ Log Activity</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Companies - CRM{% endblock %}
+{% block page_title %}Companies{% endblock %}
+{% block topbar_actions %}
+    <a href="{% url 'company_create' %}" class="btn btn-primary">+ New Company</a>
+{% endblock %}
+
+{% block content %}
+<div class="search-bar">
+    <form method="get" style="display:flex;gap:8px;flex:1;">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search companies...">
+        <button type="submit" class="btn btn-secondary">Search</button>
+        {% if q %}<a href="{% url 'company_list' %}" class="btn btn-secondary">Clear</a>{% endif %}
+    </form>
+</div>
+
+<div class="card" style="padding:0;">
+    {% if companies %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Name</th><th>Industry</th><th>Phone</th><th>Email</th><th>Contacts</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for company in companies %}
+                    <tr>
+                        <td><a href="{% url 'company_detail' company.pk %}"><strong>{{ company.name }}</strong></a></td>
+                        <td>{{ company.industry|default:"-" }}</td>
+                        <td>{{ company.phone|default:"-" }}</td>
+                        <td>{{ company.email|default:"-" }}</td>
+                        <td>{{ company.contacts.count }}</td>
+                        <td>
+                            <a href="{% url 'company_edit' company.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+                            <a href="{% url 'company_delete' company.pk %}" class="btn btn-danger btn-sm">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty">
+            <p>No companies found.</p>
+            <a href="{% url 'company_create' %}" class="btn btn-primary">Create your first company</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

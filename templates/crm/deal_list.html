@@ -1,0 +1,56 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Deals - CRM{% endblock %}
+{% block page_title %}Deals{% endblock %}
+{% block topbar_actions %}
+    <a href="{% url 'deal_create' %}" class="btn btn-primary">+ New Deal</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+    <form method="get" style="display:flex;gap:8px;flex:1;min-width:200px;">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search deals...">
+        {% if stage %}<input type="hidden" name="stage" value="{{ stage }}">{% endif %}
+        <button type="submit" class="btn btn-secondary">Search</button>
+    </form>
+    <div style="display:flex;gap:6px;">
+        <a href="{% url 'deal_list' %}" class="btn btn-secondary btn-sm {% if not stage %}btn-primary{% endif %}">All</a>
+        {% for s_key, s_label in stages %}
+            <a href="?stage={{ s_key }}" class="btn btn-sm badge-{{ s_key }}" style="text-decoration:none;">{{ s_label }}</a>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card" style="padding:0;">
+    {% if deals %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Title</th><th>Contact</th><th>Company</th><th>Value</th><th>Stage</th><th>Close Date</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for deal in deals %}
+                    <tr>
+                        <td><a href="{% url 'deal_detail' deal.pk %}"><strong>{{ deal.title }}</strong></a></td>
+                        <td>{% if deal.contact %}<a href="{% url 'contact_detail' deal.contact.pk %}">{{ deal.contact.full_name }}</a>{% else %}-{% endif %}</td>
+                        <td>{% if deal.company %}<a href="{% url 'company_detail' deal.company.pk %}">{{ deal.company }}</a>{% else %}-{% endif %}</td>
+                        <td>${{ deal.value|floatformat:0 }}</td>
+                        <td><span class="badge badge-{{ deal.stage }}">{{ deal.get_stage_display }}</span></td>
+                        <td>{{ deal.close_date|default:"-" }}</td>
+                        <td>
+                            <a href="{% url 'deal_edit' deal.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+                            <a href="{% url 'deal_delete' deal.pk %}" class="btn btn-danger btn-sm">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty">
+            <p>No deals found.</p>
+            <a href="{% url 'deal_create' %}" class="btn btn-primary">Create your first deal</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

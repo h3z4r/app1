@@ -1,0 +1,20 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Delete {{ type }} - CRM{% endblock %}
+{% block page_title %}Confirm Delete{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:480px;">
+    <div class="card-title" style="color:var(--danger);">Delete {{ type }}</div>
+    <p style="margin-bottom:24px;color:var(--text-muted);">
+        Are you sure you want to delete <strong>{{ object }}</strong>? This action cannot be undone.
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-danger">Yes, Delete</button>
+            <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
