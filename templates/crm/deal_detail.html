@@ -11,10 +11,29 @@
 <div class="detail-grid">
     <div>
         <div class="card">
-            <div class="card-title">{{ deal.title }}</div>
-            <div style="margin-bottom:16px;">
-                <span class="badge badge-{{ deal.stage }}" style="font-size:0.9rem;padding:6px 16px;">{{ deal.get_stage_display }}</span>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+                <div class="card-title" style="margin:0;">{{ deal.title }}</div>
+                <span class="badge badge-{{ deal.stage }}" style="font-size:0.85rem;padding:5px 14px;">{{ deal.get_stage_display }}</span>
+                {% if deal.at_risk %}
+                    <span class="badge-atrisk" style="font-size:0.85rem;">&#9888; At Risk</span>
+                {% endif %}
             </div>
+
+            <!-- Health score -->
+            <div class="health-panel">
+                <div class="health-panel-row">
+                    <span>Health Score</span>
+                    <span class="health-number health-{{ deal.health_color }}">{{ deal.health_score }}<small>/100</small></span>
+                </div>
+                <div class="health-bar-wrap" style="height:10px;border-radius:6px;">
+                    <div class="health-bar health-{{ deal.health_color }}" style="width:{{ deal.health_score }}%;height:10px;border-radius:6px;"></div>
+                </div>
+                <div class="health-panel-row" style="margin-top:8px;">
+                    <span style="color:var(--text-muted);font-size:0.85rem;">Close Probability</span>
+                    <span style="font-weight:700;font-size:0.95rem;color:var(--primary);">{{ deal.close_probability }}%</span>
+                </div>
+            </div>
+
             <div class="detail-field">
                 <div class="label">Value</div>
                 <div class="value" style="font-size:1.5rem;font-weight:700;color:var(--primary);">${{ deal.value|floatformat:2 }}</div>
@@ -56,7 +75,7 @@
                 <p style="color:var(--text-muted);font-size:0.9rem;">No tasks linked.</p>
             {% endif %}
             <div style="margin-top:12px;">
-                <a href="{% url 'task_create' %}" class="btn btn-secondary btn-sm">+ Add Task</a>
+                <a href="{% url 'task_create' %}?deal={{ deal.pk }}" class="btn btn-secondary btn-sm">+ Add Task</a>
             </div>
         </div>
     </div>

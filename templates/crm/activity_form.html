@@ -21,6 +21,15 @@
             <label>Notes / Body</label>
             {{ form.body }}
         </div>
+        <div class="form-group">
+            <label>
+                Meeting Transcript
+                <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;margin-left:6px;">
+                    &#129504; Sentiment will be analysed automatically
+                </span>
+            </label>
+            {{ form.transcript }}
+        </div>
         <div class="form-grid">
             <div class="form-group">
                 <label>Contact</label>
@@ -30,6 +39,10 @@
                 <label>Deal</label>
                 {{ form.deal }}
             </div>
+        </div>
+        <div class="form-group">
+            <label>Company</label>
+            {{ form.company }}
         </div>
         <div class="form-grid">
             <div class="form-group">
@@ -42,6 +55,13 @@
                 </label>
             </div>
         </div>
+
+        {% if form.instance.pk and form.instance.sentiment %}
+        <div class="sentiment-tag sentiment-{{ form.instance.sentiment }}">
+            &#129504; Sentiment: <strong>{{ form.instance.get_sentiment_display }}</strong>
+        </div>
+        {% endif %}
+
         {% if form.errors %}
             <div class="alert alert-error">Please correct the errors below.</div>
         {% endif %}

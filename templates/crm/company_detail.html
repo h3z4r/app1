@@ -11,14 +11,35 @@
 <div class="detail-grid">
     <div>
         <div class="card">
-            <div class="card-title">{{ company.name }}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+                <div class="card-title" style="margin:0;">{{ company.name }}</div>
+                <button class="btn btn-secondary btn-sm" id="enrich-btn" onclick="enrichCompany({{ company.pk }})">
+                    &#10024; Smart Suggest
+                </button>
+            </div>
+            <div id="enrich-result" style="display:none;" class="alert alert-success" style="margin-bottom:12px;"></div>
+
             <div class="detail-field">
                 <div class="label">Industry</div>
-                <div class="value">{{ company.industry|default:"-" }}</div>
+                <div class="value" id="field-industry">{{ company.industry|default:"-" }}</div>
+            </div>
+            <div class="detail-field">
+                <div class="label">Employees</div>
+                <div class="value" id="field-employees">
+                    {% if company.employee_count %}{{ company.employee_count|floatformat:0 }}{% else %}-{% endif %}
+                </div>
             </div>
             <div class="detail-field">
                 <div class="label">Website</div>
-                <div class="value">{% if company.website %}<a href="{{ company.website }}" target="_blank">{{ company.website }}</a>{% else %}-{% endif %}</div>
+                <div class="value">
+                    {% if company.website %}<a href="{{ company.website }}" target="_blank">{{ company.website }}</a>{% else %}-{% endif %}
+                </div>
+            </div>
+            <div class="detail-field">
+                <div class="label">LinkedIn</div>
+                <div class="value" id="field-linkedin">
+                    {% if company.linkedin_url %}<a href="{{ company.linkedin_url }}" target="_blank">View Profile</a>{% else %}-{% endif %}
+                </div>
             </div>
             <div class="detail-field">
                 <div class="label">Phone</div>
@@ -61,10 +82,14 @@
             {% if company.deals.all %}
                 {% for deal in company.deals.all %}
                     <div style="padding:10px 0;border-bottom:1px solid var(--border);">
-                        <a href="{% url 'deal_detail' deal.pk %}">{{ deal.title }}</a>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <a href="{% url 'deal_detail' deal.pk %}">{{ deal.title }}</a>
+                            {% if deal.at_risk %}<span class="badge-atrisk">At Risk</span>{% endif %}
+                        </div>
                         <div style="margin-top:4px;">
                             <span class="badge badge-{{ deal.stage }}">{{ deal.get_stage_display }}</span>
                             <span style="font-size:0.85rem;color:var(--text-muted);margin-left:8px;">${{ deal.value|floatformat:0 }}</span>
+                            <span style="font-size:0.8rem;color:var(--text-muted);margin-left:8px;">{{ deal.close_probability }}% probability</span>
                         </div>
                     </div>
                 {% endfor %}
@@ -80,4 +105,46 @@
         {% endwith %}
     </div>
 </div>
+
+<script>
+function enrichCompany(pk) {
+    const btn = document.getElementById("enrich-btn");
+    const resultBox = document.getElementById("enrich-result");
+    btn.disabled = true;
+    btn.textContent = "Fetching…";
+
+    fetch(`/companies/${pk}/enrich/`, {
+        method: "POST",
+        headers: { "X-CSRFToken": "{{ csrf_token }}" },
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = "&#10024; Smart Suggest";
+
+        if (data.error) {
+            resultBox.className = "alert alert-error";
+            resultBox.textContent = data.error;
+            resultBox.style.display = "block";
+            return;
+        }
+
+        const updated = data.updated || {};
+        if (Object.keys(updated).length === 0) {
+            resultBox.className = "alert alert-success";
+            resultBox.textContent = "All fields already filled — nothing to update.";
+        } else {
+            let msg = `✓ Enriched from "${data.domain}": `;
+            const parts = [];
+            if (updated.industry) { parts.push(`Industry → ${updated.industry}`); document.getElementById("field-industry").textContent = updated.industry; }
+            if (updated.employee_count) { parts.push(`Employees → ${updated.employee_count.toLocaleString()}`); document.getElementById("field-employees").textContent = updated.employee_count.toLocaleString(); }
+            if (updated.linkedin_url) { parts.push("LinkedIn URL added"); document.getElementById("field-linkedin").innerHTML = `<a href="${updated.linkedin_url}" target="_blank">View Profile</a>`; }
+            resultBox.className = "alert alert-success";
+            resultBox.textContent = msg + parts.join(", ");
+        }
+        resultBox.style.display = "block";
+        setTimeout(() => { resultBox.style.display = "none"; }, 5000);
+    });
+}
+</script>
 {% endblock %}

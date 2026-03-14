@@ -4,11 +4,15 @@ from . import views
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
 
-    # Global search
+    # Search
     path("search/", views.global_search, name="global_search"),
 
     # Timeline note
     path("timeline/add-note/", views.add_note, name="add_note"),
+
+    # Command palette
+    path("command/preview/", views.command_preview, name="command_preview"),
+    path("command/execute/", views.command_execute, name="command_execute"),
 
     # Contacts
     path("contacts/", views.contact_list, name="contact_list"),
@@ -23,6 +27,7 @@ urlpatterns = [
     path("companies/<int:pk>/", views.company_detail, name="company_detail"),
     path("companies/<int:pk>/edit/", views.company_edit, name="company_edit"),
     path("companies/<int:pk>/delete/", views.company_delete, name="company_delete"),
+    path("companies/<int:pk>/enrich/", views.company_enrich, name="company_enrich"),
 
     # Deals
     path("deals/", views.deal_list, name="deal_list"),

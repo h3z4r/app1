@@ -1,12 +1,18 @@
 import json
+import datetime
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q, Sum, Count
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.utils import timezone
 from .models import Company, Contact, Deal, Activity, Task
 from .forms import CompanyForm, ContactForm, DealForm, ActivityForm, NoteForm, TaskForm
+from .services.ai_logic import (
+    generate_suggestions, parse_command, execute_command,
+    enrich_company, extract_domain,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -15,37 +21,80 @@ from .forms import CompanyForm, ContactForm, DealForm, ActivityForm, NoteForm, T
 
 @login_required
 def dashboard(request):
-    contacts_count = Contact.objects.filter(owner=request.user).count()
-    companies_count = Company.objects.filter(owner=request.user).count()
-    deals_count = Deal.objects.filter(owner=request.user).count()
-    total_value = (
-        Deal.objects.filter(owner=request.user, stage="won")
+    user = request.user
+    contacts_count  = Contact.objects.filter(owner=user).count()
+    companies_count = Company.objects.filter(owner=user).count()
+    deals_count     = Deal.objects.filter(owner=user).count()
+    total_value     = (
+        Deal.objects.filter(owner=user, stage="won")
         .aggregate(Sum("value"))["value__sum"] or 0
     )
-    deals_by_stage = Deal.objects.filter(owner=request.user).values("stage").annotate(count=Count("id"))
+    deals_by_stage = Deal.objects.filter(owner=user).values("stage").annotate(count=Count("id"))
     recent_activities = (
-        Activity.objects.filter(owner=request.user)
+        Activity.objects.filter(owner=user)
         .select_related("contact", "deal")[:5]
     )
     recent_deals = (
-        Deal.objects.filter(owner=request.user)
+        Deal.objects.filter(owner=user)
         .select_related("contact", "company")[:5]
     )
     my_tasks = (
-        Task.objects.filter(owner=request.user)
+        Task.objects.filter(owner=user)
         .exclude(status="done")
         .select_related("contact", "deal")
         .order_by("due_date")[:10]
     )
+
+    # At-risk deals
+    at_risk_deals = (
+        Deal.objects.filter(owner=user, at_risk=True)
+        .exclude(stage__in=["won", "lost"])
+        .select_related("contact", "company")
+    )
+
+    # Next Best Action suggestions
+    suggestions = generate_suggestions(user)
+
+    # Revenue forecast — 3 past months (won) + 6 future months (expected)
+    today = timezone.now().date()
+    chart_labels, chart_won, chart_forecast = [], [], []
+    for offset in range(-3, 7):
+        # First day of month
+        m = (today.replace(day=1) + datetime.timedelta(days=32 * offset)).replace(day=1)
+        m_end = (m + datetime.timedelta(days=32)).replace(day=1)
+        chart_labels.append(m.strftime("%b %Y"))
+
+        if m < today.replace(day=1):
+            # Historical: sum of won deals updated in this month
+            won = (
+                Deal.objects.filter(owner=user, stage="won", updated_at__date__gte=m, updated_at__date__lt=m_end)
+                .aggregate(Sum("value"))["value__sum"] or 0
+            )
+            chart_won.append(float(won))
+            chart_forecast.append(None)
+        else:
+            # Forecast: weighted by close_probability
+            open_deals = Deal.objects.filter(
+                owner=user, close_date__gte=m, close_date__lt=m_end
+            ).exclude(stage__in=["won", "lost"])
+            expected = sum(float(d.value) * d.close_probability / 100 for d in open_deals)
+            chart_forecast.append(round(expected, 2))
+            chart_won.append(None)
+
     context = {
-        "contacts_count": contacts_count,
+        "contacts_count":  contacts_count,
         "companies_count": companies_count,
-        "deals_count": deals_count,
-        "total_value": total_value,
-        "deals_by_stage": {d["stage"]: d["count"] for d in deals_by_stage},
+        "deals_count":     deals_count,
+        "total_value":     total_value,
+        "deals_by_stage":  {d["stage"]: d["count"] for d in deals_by_stage},
         "recent_activities": recent_activities,
-        "recent_deals": recent_deals,
-        "my_tasks": my_tasks,
+        "recent_deals":    recent_deals,
+        "my_tasks":        my_tasks,
+        "at_risk_deals":   at_risk_deals,
+        "suggestions":     suggestions,
+        "chart_labels":    json.dumps(chart_labels),
+        "chart_won":       json.dumps(chart_won),
+        "chart_forecast":  json.dumps(chart_forecast),
     }
     return render(request, "crm/dashboard.html", context)
 
@@ -59,34 +108,20 @@ def global_search(request):
     q = request.GET.get("q", "").strip()
     contacts = companies = deals = []
     if q:
-        contacts = Contact.objects.filter(
-            owner=request.user
-        ).filter(
+        contacts  = Contact.objects.filter(owner=request.user).filter(
             Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(email__icontains=q)
         ).select_related("company")[:10]
-
-        companies = Company.objects.filter(
-            owner=request.user
-        ).filter(
+        companies = Company.objects.filter(owner=request.user).filter(
             Q(name__icontains=q) | Q(industry__icontains=q) | Q(email__icontains=q)
         )[:10]
-
-        deals = Deal.objects.filter(
-            owner=request.user
-        ).filter(
+        deals = Deal.objects.filter(owner=request.user).filter(
             Q(title__icontains=q)
         ).select_related("contact", "company")[:10]
-
-    return render(request, "crm/search_results.html", {
-        "q": q,
-        "contacts": contacts,
-        "companies": companies,
-        "deals": deals,
-    })
+    return render(request, "crm/search_results.html", {"q": q, "contacts": contacts, "companies": companies, "deals": deals})
 
 
 # ---------------------------------------------------------------------------
-# Timeline: add note
+# Timeline note
 # ---------------------------------------------------------------------------
 
 @login_required
@@ -95,28 +130,68 @@ def add_note(request):
     form = NoteForm(request.POST)
     if form.is_valid():
         body = form.cleaned_data["body"]
-        contact_id = request.POST.get("contact_id")
-        company_id = request.POST.get("company_id")
-        deal_id = request.POST.get("deal_id")
-
-        activity = Activity(
-            type="note",
-            subject="Note",
-            body=body,
-            owner=request.user,
-            is_system=False,
-        )
-        if contact_id:
-            activity.contact_id = contact_id
-        if company_id:
-            activity.company_id = company_id
-        if deal_id:
-            activity.deal_id = deal_id
+        activity = Activity(type="note", subject="Note", body=body, owner=request.user, is_system=False)
+        for field in ("contact_id", "company_id", "deal_id"):
+            val = request.POST.get(field.replace("_id", "") + "_id")
+            if val:
+                setattr(activity, field, val)
         activity.save()
         messages.success(request, "Note added.")
-
-    # Redirect back to where we came from
     return redirect(request.POST.get("next", "/"))
+
+
+# ---------------------------------------------------------------------------
+# Company enrichment
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_POST
+def company_enrich(request, pk):
+    company = get_object_or_404(Company, pk=pk, owner=request.user)
+    domain = request.POST.get("domain") or extract_domain(company.website)
+    if not domain:
+        return JsonResponse({"error": "No domain provided and no website set on company."}, status=400)
+
+    data = enrich_company(domain)
+    updated = {}
+    if data.get("industry") and not company.industry:
+        company.industry = data["industry"]
+        updated["industry"] = data["industry"]
+    if data.get("employee_count") and not company.employee_count:
+        company.employee_count = data["employee_count"]
+        updated["employee_count"] = data["employee_count"]
+    if data.get("linkedin_url") and not company.linkedin_url:
+        company.linkedin_url = data["linkedin_url"]
+        updated["linkedin_url"] = data["linkedin_url"]
+
+    if updated:
+        company.save()
+
+    return JsonResponse({"ok": True, "updated": updated, "domain": domain})
+
+
+# ---------------------------------------------------------------------------
+# Command palette
+# ---------------------------------------------------------------------------
+
+@login_required
+def command_preview(request):
+    q = request.GET.get("q", "").strip()
+    if not q:
+        return JsonResponse({"message": "", "action": None})
+    result = parse_command(q, request.user)
+    return JsonResponse(result)
+
+
+@login_required
+@require_POST
+def command_execute(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    result = execute_command(data, request.user)
+    return JsonResponse(result)
 
 
 # ---------------------------------------------------------------------------
@@ -128,9 +203,7 @@ def contact_list(request):
     q = request.GET.get("q", "")
     contacts = Contact.objects.filter(owner=request.user).select_related("company")
     if q:
-        contacts = contacts.filter(
-            Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(email__icontains=q)
-        )
+        contacts = contacts.filter(Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(email__icontains=q))
     return render(request, "crm/contact_list.html", {"contacts": contacts, "q": q})
 
 
@@ -138,23 +211,18 @@ def contact_list(request):
 def contact_detail(request, pk):
     contact = get_object_or_404(Contact, pk=pk, owner=request.user)
     timeline = Activity.objects.filter(contact=contact).select_related("owner").order_by("-created_at")
-    note_form = NoteForm()
-    return render(request, "crm/contact_detail.html", {
-        "contact": contact,
-        "timeline": timeline,
-        "note_form": note_form,
-    })
+    return render(request, "crm/contact_detail.html", {"contact": contact, "timeline": timeline, "note_form": NoteForm()})
 
 
 @login_required
 def contact_create(request):
     form = ContactForm(request.POST or None)
     if form.is_valid():
-        contact = form.save(commit=False)
-        contact.owner = request.user
-        contact.save()
+        c = form.save(commit=False)
+        c.owner = request.user
+        c.save()
         messages.success(request, "Contact created.")
-        return redirect("contact_detail", pk=contact.pk)
+        return redirect("contact_detail", pk=c.pk)
     return render(request, "crm/contact_form.html", {"form": form, "title": "New Contact"})
 
 
@@ -196,23 +264,18 @@ def company_list(request):
 def company_detail(request, pk):
     company = get_object_or_404(Company, pk=pk, owner=request.user)
     timeline = Activity.objects.filter(company=company).select_related("owner").order_by("-created_at")
-    note_form = NoteForm()
-    return render(request, "crm/company_detail.html", {
-        "company": company,
-        "timeline": timeline,
-        "note_form": note_form,
-    })
+    return render(request, "crm/company_detail.html", {"company": company, "timeline": timeline, "note_form": NoteForm()})
 
 
 @login_required
 def company_create(request):
     form = CompanyForm(request.POST or None)
     if form.is_valid():
-        company = form.save(commit=False)
-        company.owner = request.user
-        company.save()
+        c = form.save(commit=False)
+        c.owner = request.user
+        c.save()
         messages.success(request, "Company created.")
-        return redirect("company_detail", pk=company.pk)
+        return redirect("company_detail", pk=c.pk)
     return render(request, "crm/company_form.html", {"form": form, "title": "New Company"})
 
 
@@ -231,17 +294,12 @@ def company_edit(request, pk):
 def company_delete(request, pk):
     company = get_object_or_404(Company, pk=pk, owner=request.user)
     if request.method == "POST":
-        action = request.POST.get("action", "nullify")
-        if action == "cascade":
+        if request.POST.get("action") == "cascade":
             company.contacts.all().delete()
         company.delete()
         messages.success(request, "Company deleted.")
         return redirect("company_list")
-    contact_count = company.contacts.count()
-    return render(request, "crm/company_confirm_delete.html", {
-        "company": company,
-        "contact_count": contact_count,
-    })
+    return render(request, "crm/company_confirm_delete.html", {"company": company, "contact_count": company.contacts.count()})
 
 
 # ---------------------------------------------------------------------------
@@ -257,27 +315,17 @@ def deal_list(request):
         deals = deals.filter(Q(title__icontains=q))
     if stage:
         deals = deals.filter(stage=stage)
-    return render(request, "crm/deal_list.html", {
-        "deals": deals, "q": q, "stage": stage, "stages": Deal.STAGE_CHOICES,
-    })
+    return render(request, "crm/deal_list.html", {"deals": deals, "q": q, "stage": stage, "stages": Deal.STAGE_CHOICES})
 
 
 @login_required
 def deal_kanban(request):
     deals = Deal.objects.filter(owner=request.user).select_related("contact", "company")
-
     columns = []
     for key, label in Deal.STAGE_CHOICES:
         stage_deals = [d for d in deals if d.stage == key]
         total = sum(d.value for d in stage_deals)
-        columns.append({
-            "key": key,
-            "label": label,
-            "deals": stage_deals,
-            "total": total,
-            "count": len(stage_deals),
-        })
-
+        columns.append({"key": key, "label": label, "deals": stage_deals, "total": total, "count": len(stage_deals)})
     return render(request, "crm/deal_kanban.html", {"columns": columns})
 
 
@@ -290,11 +338,9 @@ def deal_update_stage(request, pk):
         new_stage = data.get("stage")
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-    valid_stages = [s[0] for s in Deal.STAGE_CHOICES]
-    if new_stage not in valid_stages:
+    valid = [s[0] for s in Deal.STAGE_CHOICES]
+    if new_stage not in valid:
         return JsonResponse({"error": "Invalid stage"}, status=400)
-
     deal.stage = new_stage
     deal.save()
     return JsonResponse({"ok": True, "stage": new_stage})
@@ -304,17 +350,16 @@ def deal_update_stage(request, pk):
 def deal_detail(request, pk):
     deal = get_object_or_404(Deal, pk=pk, owner=request.user)
     timeline = Activity.objects.filter(deal=deal).select_related("owner").order_by("-created_at")
-    note_form = NoteForm()
-    return render(request, "crm/deal_detail.html", {
-        "deal": deal,
-        "timeline": timeline,
-        "note_form": note_form,
-    })
+    return render(request, "crm/deal_detail.html", {"deal": deal, "timeline": timeline, "note_form": NoteForm()})
 
 
 @login_required
 def deal_create(request):
-    form = DealForm(request.POST or None)
+    initial = {}
+    # Support pre-fill from command palette
+    if request.GET.get("company_id"):
+        initial["company"] = request.GET["company_id"]
+    form = DealForm(request.POST or None, initial=initial)
     if form.is_valid():
         deal = form.save(commit=False)
         deal.owner = request.user
@@ -359,9 +404,9 @@ def activity_list(request):
 def activity_create(request):
     form = ActivityForm(request.POST or None)
     if form.is_valid():
-        activity = form.save(commit=False)
-        activity.owner = request.user
-        activity.save()
+        a = form.save(commit=False)
+        a.owner = request.user
+        a.save()
         messages.success(request, "Activity logged.")
         return redirect("activity_list")
     return render(request, "crm/activity_form.html", {"form": form, "title": "Log Activity"})
@@ -398,16 +443,21 @@ def task_list(request):
     tasks = Task.objects.filter(owner=request.user).select_related("contact", "deal")
     if status_filter:
         tasks = tasks.filter(status=status_filter)
-    return render(request, "crm/task_list.html", {
-        "tasks": tasks,
-        "status_filter": status_filter,
-        "status_choices": Task.STATUS_CHOICES,
-    })
+    return render(request, "crm/task_list.html", {"tasks": tasks, "status_filter": status_filter, "status_choices": Task.STATUS_CHOICES})
 
 
 @login_required
 def task_create(request):
-    form = TaskForm(request.POST or None)
+    # Support pre-fill from suggestions / command palette
+    initial = {}
+    if request.GET.get("contact"):
+        initial["contact"] = request.GET["contact"]
+    if request.GET.get("deal"):
+        initial["deal"] = request.GET["deal"]
+    if request.GET.get("prefill_title"):
+        initial["title"] = request.GET["prefill_title"]
+
+    form = TaskForm(request.POST or None, initial=initial)
     if form.is_valid():
         task = form.save(commit=False)
         task.owner = request.user

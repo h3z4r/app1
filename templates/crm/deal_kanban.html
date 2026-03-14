@@ -1,5 +1,4 @@
 {% extends "crm/base.html" %}
-{% load static %}
 
 {% block title %}Kanban Board - CRM{% endblock %}
 {% block page_title %}Kanban Board{% endblock %}
@@ -21,9 +20,30 @@
         </div>
         <div class="kanban-cards" id="col-{{ col.key }}">
             {% for deal in col.deals %}
-            <div class="kanban-card" data-deal-id="{{ deal.pk }}" data-stage="{{ deal.stage }}">
-                <a href="{% url 'deal_detail' deal.pk %}" class="kanban-card-title">{{ deal.title }}</a>
+            <div class="kanban-card" data-deal-id="{{ deal.pk }}" data-stage="{{ deal.stage }}" data-value="{{ deal.value }}">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+                    <a href="{% url 'deal_detail' deal.pk %}" class="kanban-card-title">{{ deal.title }}</a>
+                    {% if deal.at_risk %}<span class="badge-atrisk" title="At Risk">&#9888;</span>{% endif %}
+                </div>
                 <div class="kanban-card-value">${{ deal.value|floatformat:0 }}</div>
+
+                <!-- Health score bar -->
+                <div style="margin:8px 0 4px;">
+                    <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">
+                        <span>Health</span>
+                        <span>{{ deal.health_score }}/100</span>
+                    </div>
+                    <div class="health-bar-wrap">
+                        <div class="health-bar health-{{ deal.health_color }}" style="width:{{ deal.health_score }}%"></div>
+                    </div>
+                </div>
+
+                <!-- Close probability -->
+                <div class="kanban-card-prob">
+                    <span class="prob-dot"></span>
+                    {{ deal.close_probability }}% close probability
+                </div>
+
                 {% if deal.contact %}
                     <div class="kanban-card-meta">&#9786; {{ deal.contact.full_name }}</div>
                 {% endif %}
@@ -40,30 +60,21 @@
     {% endfor %}
 </div>
 
-<!-- SortableJS from CDN -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 (function () {
     const CSRF = "{{ csrf_token }}";
 
-    // Track per-column totals for optimistic update
-    const colTotals = {};
-    document.querySelectorAll(".kanban-col").forEach(col => {
-        colTotals[col.dataset.stage] = parseFloat(
-            col.querySelector(".kanban-col-total").textContent.replace(/[$,]/g, "")
-        ) || 0;
-    });
-
     function getCardValue(card) {
-        const raw = card.querySelector(".kanban-card-value")?.textContent.replace(/[$,]/g, "") || "0";
-        return parseFloat(raw) || 0;
+        return parseFloat(card.dataset.value || "0");
     }
 
     function updateColHeader(colEl) {
         const cards = colEl.querySelectorAll(".kanban-card");
-        const total = Array.from(cards).reduce((sum, c) => sum + getCardValue(c), 0);
+        const total = Array.from(cards).reduce((s, c) => s + getCardValue(c), 0);
         colEl.querySelector(".kanban-col-count").textContent = cards.length;
-        colEl.querySelector(".kanban-col-total").textContent = "$" + total.toLocaleString("en-US", {maximumFractionDigits: 0});
+        colEl.querySelector(".kanban-col-total").textContent =
+            "$" + total.toLocaleString("en-US", { maximumFractionDigits: 0 });
     }
 
     document.querySelectorAll(".kanban-cards").forEach(container => {
@@ -72,28 +83,20 @@
             animation: 150,
             ghostClass: "kanban-card-ghost",
             dragClass: "kanban-card-drag",
-
-            onEnd: function (evt) {
+            onEnd(evt) {
                 const card = evt.item;
-                const newColEl = evt.to.closest(".kanban-col");
-                const oldColEl = evt.from.closest(".kanban-col");
-                const newStage = newColEl.dataset.stage;
+                const newCol = evt.to.closest(".kanban-col");
+                const oldCol = evt.from.closest(".kanban-col");
+                const newStage = newCol.dataset.stage;
                 const dealId = card.dataset.dealId;
 
-                // Optimistic UI: update both column headers immediately
-                updateColHeader(newColEl);
-                if (oldColEl !== newColEl) updateColHeader(oldColEl);
-
-                // If stage didn't change, nothing to save
+                updateColHeader(newCol);
+                if (oldCol !== newCol) updateColHeader(oldCol);
                 if (card.dataset.stage === newStage) return;
 
-                // Persist to server
                 fetch(`/deals/${dealId}/update-stage/`, {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": CSRF,
-                    },
+                    headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
                     body: JSON.stringify({ stage: newStage }),
                 })
                 .then(r => r.json())
@@ -101,18 +104,17 @@
                     if (data.ok) {
                         card.dataset.stage = newStage;
                     } else {
-                        // Revert: move card back to original column
                         evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
-                        updateColHeader(newColEl);
-                        updateColHeader(oldColEl);
+                        updateColHeader(newCol);
+                        updateColHeader(oldCol);
                         alert("Failed to update stage. Please refresh.");
                     }
                 })
                 .catch(() => {
                     evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
-                    updateColHeader(newColEl);
-                    updateColHeader(oldColEl);
-                    alert("Network error. Please check your connection.");
+                    updateColHeader(newCol);
+                    updateColHeader(oldCol);
+                    alert("Network error.");
                 });
             }
         });

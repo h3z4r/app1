@@ -37,8 +37,9 @@
             </a>
         </nav>
         <div class="sidebar-footer">
-            Signed in as <strong>{{ request.user.username }}</strong><br>
+            <div style="margin-bottom:6px;">Signed in as <strong>{{ request.user.username }}</strong></div>
             <a href="{% url 'logout' %}">Sign out</a>
+            <div style="margin-top:10px;font-size:0.75rem;color:#818cf8;">Press <kbd>Ctrl+K</kbd> for commands</div>
         </div>
     </aside>
 
@@ -47,9 +48,10 @@
             <span class="topbar-title">{% block page_title %}{% endblock %}</span>
             <div class="topbar-right">
                 <form action="{% url 'global_search' %}" method="get" class="global-search-form">
-                    <input type="text" name="q" placeholder="Search contacts, companies, deals..." value="{{ request.GET.q|default:'' }}">
+                    <input type="text" name="q" placeholder="Search everything..." value="{{ request.GET.q|default:'' }}">
                     <button type="submit">&#128269;</button>
                 </form>
+                <button class="btn btn-secondary btn-sm" id="cmd-trigger" title="Ctrl+K">&#9881; Command</button>
                 <div>{% block topbar_actions %}{% endblock %}</div>
             </div>
         </header>
@@ -60,9 +62,126 @@
                     {{ message }}
                 </div>
             {% endfor %}
-
             {% block content %}{% endblock %}
         </div>
     </div>
+
+    <!-- ── Command Palette ── -->
+    <div id="cmd-overlay" class="cmd-overlay" style="display:none;" aria-modal="true" role="dialog">
+        <div class="cmd-modal">
+            <div class="cmd-header">
+                <span class="cmd-icon">&#9881;</span>
+                <input type="text" id="cmd-input" class="cmd-input" placeholder='Try "Add $5000 deal to Acme Corp" or "Go to Kanban"' autocomplete="off">
+                <kbd class="cmd-esc" id="cmd-close">ESC</kbd>
+            </div>
+            <div id="cmd-preview" class="cmd-preview"></div>
+            <div id="cmd-actions" class="cmd-actions" style="display:none;">
+                <button id="cmd-execute" class="btn btn-primary">Execute &#9166;</button>
+                <span id="cmd-hint" class="cmd-hint"></span>
+            </div>
+            <div class="cmd-footer">
+                <span>&#x21B5; Execute</span>
+                <span>ESC Close</span>
+                <span>Examples: "Remind me to call John tomorrow" &middot; "Go to Contacts"</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const CSRF = "{{ csrf_token }}";
+        const overlay  = document.getElementById("cmd-overlay");
+        const input    = document.getElementById("cmd-input");
+        const preview  = document.getElementById("cmd-preview");
+        const actions  = document.getElementById("cmd-actions");
+        const execBtn  = document.getElementById("cmd-execute");
+        const hint     = document.getElementById("cmd-hint");
+        const closeBtn = document.getElementById("cmd-close");
+        const trigger  = document.getElementById("cmd-trigger");
+
+        let debounceTimer = null;
+        let lastResult = null;
+
+        function openPalette() {
+            overlay.style.display = "flex";
+            input.value = "";
+            preview.textContent = "";
+            actions.style.display = "none";
+            lastResult = null;
+            setTimeout(() => input.focus(), 50);
+        }
+
+        function closePalette() {
+            overlay.style.display = "none";
+        }
+
+        function showPreview(result) {
+            lastResult = result;
+            if (result.error) {
+                preview.innerHTML = `<span class="cmd-error">&#9888; ${result.error}</span>`;
+                actions.style.display = "none";
+            } else {
+                preview.innerHTML = `<span class="cmd-ok">&#10003; ${result.message}</span>`;
+                hint.textContent = result.action === "navigate" ? "Will navigate immediately." : "Will create the record.";
+                actions.style.display = "flex";
+            }
+        }
+
+        function fetchPreview(q) {
+            if (!q.trim()) { preview.textContent = ""; actions.style.display = "none"; return; }
+            fetch(`/command/preview/?q=${encodeURIComponent(q)}`)
+                .then(r => r.json())
+                .then(showPreview);
+        }
+
+        input.addEventListener("input", () => {
+            clearTimeout(debounceTimer);
+            preview.innerHTML = `<span style="color:var(--text-muted)">&#8230;</span>`;
+            debounceTimer = setTimeout(() => fetchPreview(input.value), 300);
+        });
+
+        input.addEventListener("keydown", e => {
+            if (e.key === "Enter" && lastResult && !lastResult.error) doExecute();
+            if (e.key === "Escape") closePalette();
+        });
+
+        execBtn.addEventListener("click", doExecute);
+        closeBtn.addEventListener("click", closePalette);
+        trigger.addEventListener("click", openPalette);
+
+        overlay.addEventListener("click", e => {
+            if (e.target === overlay) closePalette();
+        });
+
+        document.addEventListener("keydown", e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+                e.preventDefault();
+                overlay.style.display === "none" ? openPalette() : closePalette();
+            }
+        });
+
+        function doExecute() {
+            if (!lastResult || lastResult.error) return;
+            execBtn.disabled = true;
+            execBtn.textContent = "Working…";
+            fetch("/command/execute/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
+                body: JSON.stringify(lastResult),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok && data.redirect) {
+                    closePalette();
+                    window.location.href = data.redirect;
+                } else {
+                    preview.innerHTML = `<span class="cmd-error">&#9888; ${data.error || "Something went wrong."}</span>`;
+                    execBtn.disabled = false;
+                    execBtn.textContent = "Execute ↵";
+                }
+            });
+        }
+    })();
+    </script>
 </body>
 </html>

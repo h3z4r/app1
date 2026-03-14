@@ -10,6 +10,8 @@ class Company(models.Model):
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
     industry = models.CharField(max_length=100, blank=True)
+    employee_count = models.IntegerField(null=True, blank=True)
+    linkedin_url = models.URLField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="companies")
@@ -62,6 +64,10 @@ class Deal(models.Model):
     stage = models.CharField(max_length=20, choices=STAGE_CHOICES, default="lead")
     close_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
+    # V3 fields
+    health_score = models.IntegerField(default=50)
+    close_probability = models.IntegerField(default=10)
+    at_risk = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="deals")
@@ -71,6 +77,14 @@ class Deal(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def health_color(self):
+        if self.health_score >= 70:
+            return "green"
+        if self.health_score >= 40:
+            return "orange"
+        return "red"
 
 
 class Activity(models.Model):
@@ -82,16 +96,23 @@ class Activity(models.Model):
         ("task", "Task"),
         ("stage_change", "Stage Change"),
     ]
+    SENTIMENT_CHOICES = [
+        ("positive", "Positive"),
+        ("neutral", "Neutral"),
+        ("concerned", "Concerned"),
+    ]
 
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     subject = models.CharField(max_length=255)
     body = models.TextField(blank=True)
+    transcript = models.TextField(blank=True)
+    sentiment = models.CharField(max_length=10, choices=SENTIMENT_CHOICES, blank=True)
     contact = models.ForeignKey(Contact, on_delete=models.SET_NULL, null=True, blank=True, related_name="activities")
     company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="activities")
     deal = models.ForeignKey(Deal, on_delete=models.SET_NULL, null=True, blank=True, related_name="activities")
     due_date = models.DateTimeField(null=True, blank=True)
     completed = models.BooleanField(default=False)
-    is_system = models.BooleanField(default=False)  # True = auto-logged by signals
+    is_system = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="activities")
 
@@ -133,7 +154,6 @@ class Task(models.Model):
 
     @property
     def due_status(self):
-        """Returns 'overdue', 'soon', or 'ok' based on due_date."""
         if not self.due_date or self.status == "done":
             return "ok"
         today = timezone.now().date()

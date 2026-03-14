@@ -4,27 +4,103 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+
+<!-- ── Stats ── -->
 <div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-label">Contacts</div>
-        <div class="stat-value">{{ contacts_count }}</div>
+    <div class="stat-card"><div class="stat-label">Contacts</div><div class="stat-value">{{ contacts_count }}</div></div>
+    <div class="stat-card"><div class="stat-label">Companies</div><div class="stat-value">{{ companies_count }}</div></div>
+    <div class="stat-card"><div class="stat-label">Deals</div><div class="stat-value">{{ deals_count }}</div></div>
+    <div class="stat-card"><div class="stat-label">Won Revenue</div><div class="stat-value">${{ total_value|floatformat:0 }}</div></div>
+</div>
+
+<!-- ── At-Risk Alert ── -->
+{% if at_risk_deals %}
+<div class="at-risk-banner">
+    <span class="at-risk-icon">🚨</span>
+    <div>
+        <strong>At-Risk Deals</strong> — negative language detected in recent notes:
+        {% for d in at_risk_deals %}
+            <a href="{% url 'deal_detail' d.pk %}" class="at-risk-link">{{ d.title }}</a>{% if not forloop.last %}, {% endif %}
+        {% endfor %}
     </div>
-    <div class="stat-card">
-        <div class="stat-label">Companies</div>
-        <div class="stat-value">{{ companies_count }}</div>
+</div>
+{% endif %}
+
+<!-- ── Next Best Action Suggestions ── -->
+{% if suggestions %}
+<div class="card">
+    <div class="card-title">&#129504; Next Best Actions</div>
+    <div class="suggestions-list">
+        {% for s in suggestions %}
+        <div class="suggestion-row">
+            <span class="suggestion-icon">{{ s.icon }}</span>
+            <span class="suggestion-msg">{{ s.message }}</span>
+            <a href="{{ s.action_url }}" class="btn btn-primary btn-sm">{{ s.action_label }}</a>
+        </div>
+        {% endfor %}
     </div>
-    <div class="stat-card">
-        <div class="stat-label">Deals</div>
-        <div class="stat-value">{{ deals_count }}</div>
+</div>
+{% endif %}
+
+<!-- ── Revenue Forecast Chart ── -->
+<div class="card">
+    <div class="card-title">&#128200; Revenue Forecast</div>
+    <div style="position:relative;height:240px;">
+        <canvas id="revenueChart"></canvas>
     </div>
-    <div class="stat-card">
-        <div class="stat-label">Won Revenue</div>
-        <div class="stat-value">${{ total_value|floatformat:0 }}</div>
+    <div style="display:flex;gap:20px;margin-top:12px;font-size:0.8rem;color:var(--text-muted);">
+        <span><span style="display:inline-block;width:12px;height:12px;background:#10b981;border-radius:2px;margin-right:4px;"></span>Won Revenue (historical)</span>
+        <span><span style="display:inline-block;width:12px;height:12px;background:#4f46e5;border-radius:2px;margin-right:4px;opacity:0.6;"></span>Expected Revenue (forecast)</span>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    const labels   = {{ chart_labels|safe }};
+    const wonData  = {{ chart_won|safe }};
+    const fcastData= {{ chart_forecast|safe }};
+
+    new Chart(document.getElementById("revenueChart"), {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Won Revenue",
+                    data: wonData,
+                    backgroundColor: "#10b981",
+                    borderRadius: 6,
+                },
+                {
+                    label: "Forecasted",
+                    data: fcastData,
+                    backgroundColor: "rgba(79,70,229,0.55)",
+                    borderRadius: 6,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: v => "$" + (v >= 1000 ? (v/1000).toFixed(0) + "k" : v),
+                    },
+                    grid: { color: "#f1f5f9" },
+                },
+                x: { grid: { display: false } },
+            },
+        },
+    });
+})();
+</script>
+
+<!-- ── Bottom grid: My Tasks + Recent Deals ── -->
 <div class="dashboard-grid">
-    <!-- My Tasks widget -->
     <div class="card">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
             My Tasks
@@ -45,15 +121,12 @@
                 <span class="badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
             </div>
             {% endfor %}
-            <div style="margin-top:12px;">
-                <a href="{% url 'task_list' %}" class="btn btn-secondary btn-sm">View all tasks</a>
-            </div>
+            <div style="margin-top:12px;"><a href="{% url 'task_list' %}" class="btn btn-secondary btn-sm">View all tasks</a></div>
         {% else %}
             <div class="empty"><p>No open tasks.</p><a href="{% url 'task_create' %}" class="btn btn-primary">Create task</a></div>
         {% endif %}
     </div>
 
-    <!-- Recent Deals -->
     <div class="card">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
             Recent Deals
@@ -62,12 +135,21 @@
         {% if recent_deals %}
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>Title</th><th>Stage</th><th>Value</th></tr></thead>
+                    <thead><tr><th>Title</th><th>Stage</th><th>Health</th><th>Value</th></tr></thead>
                     <tbody>
                         {% for deal in recent_deals %}
                         <tr>
-                            <td><a href="{% url 'deal_detail' deal.pk %}">{{ deal.title }}</a></td>
+                            <td>
+                                <a href="{% url 'deal_detail' deal.pk %}">{{ deal.title }}</a>
+                                {% if deal.at_risk %}<span class="badge-atrisk">At Risk</span>{% endif %}
+                            </td>
                             <td><span class="badge badge-{{ deal.stage }}">{{ deal.get_stage_display }}</span></td>
+                            <td>
+                                <div class="health-bar-wrap" title="{{ deal.health_score }}/100">
+                                    <div class="health-bar health-{{ deal.health_color }}" style="width:{{ deal.health_score }}%"></div>
+                                </div>
+                                <span class="health-label">{{ deal.health_score }}</span>
+                            </td>
                             <td>${{ deal.value|floatformat:0 }}</td>
                         </tr>
                         {% endfor %}
@@ -78,33 +160,6 @@
             <div class="empty"><p>No deals yet.</p><a href="{% url 'deal_create' %}" class="btn btn-primary">New Deal</a></div>
         {% endif %}
     </div>
-
-    <!-- Recent Activities -->
-    <div class="card" style="grid-column: 1 / -1;">
-        <div class="card-title">Recent Activity</div>
-        {% if recent_activities %}
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Type</th><th>Subject</th><th>Contact</th><th>Deal</th><th>Date</th></tr></thead>
-                    <tbody>
-                        {% for activity in recent_activities %}
-                        <tr>
-                            <td>
-                                {% if activity.is_system %}<span style="color:var(--text-muted);font-size:0.8rem;">&#9881;</span>{% endif %}
-                                {{ activity.get_type_display }}
-                            </td>
-                            <td>{{ activity.subject }}</td>
-                            <td>{% if activity.contact %}{{ activity.contact.full_name }}{% else %}-{% endif %}</td>
-                            <td>{% if activity.deal %}{{ activity.deal }}{% else %}-{% endif %}</td>
-                            <td style="color:var(--text-muted);font-size:0.85rem;">{{ activity.created_at|date:"M d, Y" }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <div class="empty"><p>No activities yet.</p></div>
-        {% endif %}
-    </div>
 </div>
+
 {% endblock %}

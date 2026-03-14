@@ -5,7 +5,7 @@ from .models import Company, Contact, Deal, Activity, Task
 class CompanyForm(forms.ModelForm):
     class Meta:
         model = Company
-        fields = ["name", "website", "phone", "email", "address", "industry"]
+        fields = ["name", "website", "phone", "email", "address", "industry", "employee_count", "linkedin_url"]
         widgets = {
             "address": forms.Textarea(attrs={"rows": 3}),
         }
@@ -33,10 +33,11 @@ class DealForm(forms.ModelForm):
 class ActivityForm(forms.ModelForm):
     class Meta:
         model = Activity
-        fields = ["type", "subject", "body", "contact", "company", "deal", "due_date", "completed"]
+        fields = ["type", "subject", "body", "transcript", "contact", "company", "deal", "due_date", "completed"]
         widgets = {
             "due_date": forms.DateTimeInput(attrs={"type": "datetime-local"}),
             "body": forms.Textarea(attrs={"rows": 3}),
+            "transcript": forms.Textarea(attrs={"rows": 5, "placeholder": "Paste meeting transcript here — sentiment will be analysed automatically..."}),
         }
 
 
