@@ -49,4 +49,24 @@ urlpatterns = [
     path("tasks/new/", views.task_create, name="task_create"),
     path("tasks/<int:pk>/edit/", views.task_edit, name="task_edit"),
     path("tasks/<int:pk>/delete/", views.task_delete, name="task_delete"),
+
+    # V4 — Agent
+    path("agent/run/", views.agent_run, name="agent_run"),
+
+    # V4 — Unified Inbox
+    path("inbox/", views.unified_inbox, name="unified_inbox"),
+    path("inbox/<int:pk>/", views.inbox_message_detail, name="inbox_message_detail"),
+
+    # V4 — Human-in-the-Loop
+    path("approvals/", views.suggested_changes, name="suggested_changes"),
+    path("approvals/<int:pk>/review/", views.suggested_change_review, name="suggested_change_review"),
+
+    # V4 — Audit Log
+    path("audit/", views.audit_log, name="audit_log"),
+
+    # V4 — Voice note
+    path("voice-note/process/", views.process_voice_note, name="process_voice_note"),
+
+    # V4 — Leaderboard
+    path("leaderboard/", views.leaderboard, name="leaderboard"),
 ]

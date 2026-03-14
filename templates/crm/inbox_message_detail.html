@@ -1,0 +1,59 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Message - CRM{% endblock %}
+{% block page_title %}Message{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'unified_inbox' %}" class="btn btn-secondary btn-sm">&#8592; Back to Inbox</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="inbox-detail-header">
+        <span class="inbox-source-badge source-{{ msg.source }}">
+            {% if msg.source == 'whatsapp' %}&#128242;{% elif msg.source == 'email' %}&#9993;{% else %}&#128203;{% endif %}
+            {{ msg.get_source_display }}
+        </span>
+        <span class="inbox-direction">{{ msg.get_direction_display }}</span>
+        <span class="inbox-time">{{ msg.timestamp|date:"M d, Y H:i" }}</span>
+    </div>
+
+    {% if msg.contact %}
+    <div class="inbox-detail-contact">
+        From: <a href="{% url 'contact_detail' msg.contact.pk %}">{{ msg.contact.full_name }}</a>
+    </div>
+    {% endif %}
+
+    {% if msg.subject %}
+    <h2 class="inbox-detail-subject">{{ msg.subject }}</h2>
+    {% endif %}
+
+    <div class="inbox-detail-body">{{ msg.body|linebreaks }}</div>
+</div>
+
+{% if quick_replies %}
+<div class="card">
+    <div class="card-title">&#129302; Quick Reply Suggestions</div>
+    <p style="color:var(--text-muted);font-size:0.88rem;">AI-generated based on message sentiment. Copy and send from your email/WhatsApp app.</p>
+    {% for reply in quick_replies %}
+    <div class="quick-reply-block">
+        <pre class="quick-reply-text">{{ reply }}</pre>
+        <button class="btn btn-secondary btn-sm copy-btn" data-text="{{ reply }}">&#128203; Copy</button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<script>
+document.querySelectorAll(".copy-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        navigator.clipboard.writeText(btn.dataset.text).then(() => {
+            btn.textContent = "✓ Copied";
+            setTimeout(() => btn.textContent = "📋 Copy", 2000);
+        });
+    });
+});
+</script>
+
+{% endblock %}

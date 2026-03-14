@@ -1,0 +1,60 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Leaderboard - CRM{% endblock %}
+{% block page_title %}Leaderboard{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-title">&#127942; Sales Leaderboard</div>
+    <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:16px;">
+        Win rate and speed-to-lead metrics across all active users.
+    </p>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>User</th>
+                    <th>Won</th>
+                    <th>Lost</th>
+                    <th>Win Rate</th>
+                    <th>Speed to Lead (days avg)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in board %}
+                <tr class="{% if forloop.first %}leaderboard-top{% endif %}">
+                    <td class="leaderboard-rank">
+                        {% if forloop.counter == 1 %}&#129351;
+                        {% elif forloop.counter == 2 %}&#129352;
+                        {% elif forloop.counter == 3 %}&#129353;
+                        {% else %}{{ forloop.counter }}
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ row.user.username }}</strong></td>
+                    <td class="leaderboard-won">{{ row.won }}</td>
+                    <td class="leaderboard-lost">{{ row.lost }}</td>
+                    <td>
+                        <div class="win-rate-bar-wrap" title="{{ row.win_rate_pct }}%">
+                            <div class="win-rate-bar" style="width:{{ row.win_rate_pct }}%"></div>
+                        </div>
+                        <span class="win-rate-label">{{ row.win_rate_pct }}%</span>
+                    </td>
+                    <td>
+                        {% if row.speed_to_lead is not None %}
+                            {{ row.speed_to_lead }} days
+                        {% else %}
+                            <span style="color:var(--text-muted)">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No users found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

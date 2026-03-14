@@ -29,6 +29,8 @@ class Contact(models.Model):
     last_name = models.CharField(max_length=100)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
+    whatsapp_number = models.CharField(max_length=50, blank=True)
+    linkedin_profile_url = models.URLField(blank=True)
     company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="contacts")
     job_title = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
@@ -53,6 +55,7 @@ class Deal(models.Model):
         ("qualified", "Qualified"),
         ("proposal", "Proposal"),
         ("negotiation", "Negotiation"),
+        ("nurture", "Nurture"),
         ("won", "Won"),
         ("lost", "Lost"),
     ]
@@ -64,10 +67,10 @@ class Deal(models.Model):
     stage = models.CharField(max_length=20, choices=STAGE_CHOICES, default="lead")
     close_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
-    # V3 fields
     health_score = models.IntegerField(default=50)
     close_probability = models.IntegerField(default=10)
     at_risk = models.BooleanField(default=False)
+    requires_approval = models.BooleanField(default=False)  # human-in-the-loop flag
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="deals")
@@ -86,6 +89,10 @@ class Deal(models.Model):
             return "orange"
         return "red"
 
+    @property
+    def is_high_value(self):
+        return float(self.value) > 50_000
+
 
 class Activity(models.Model):
     TYPE_CHOICES = [
@@ -95,6 +102,7 @@ class Activity(models.Model):
         ("note", "Note"),
         ("task", "Task"),
         ("stage_change", "Stage Change"),
+        ("voice_note", "Voice Note"),
     ]
     SENTIMENT_CHOICES = [
         ("positive", "Positive"),
@@ -125,16 +133,8 @@ class Activity(models.Model):
 
 
 class Task(models.Model):
-    PRIORITY_CHOICES = [
-        ("low", "Low"),
-        ("medium", "Medium"),
-        ("high", "High"),
-    ]
-    STATUS_CHOICES = [
-        ("todo", "To Do"),
-        ("in_progress", "In Progress"),
-        ("done", "Done"),
-    ]
+    PRIORITY_CHOICES = [("low", "Low"), ("medium", "Medium"), ("high", "High")]
+    STATUS_CHOICES = [("todo", "To Do"), ("in_progress", "In Progress"), ("done", "Done")]
 
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -163,3 +163,99 @@ class Task(models.Model):
         if delta <= 3:
             return "soon"
         return "ok"
+
+
+# ── V4 Models ────────────────────────────────────────────────────────────────
+
+class AuditLog(models.Model):
+    """Every AI-agent action is recorded here (EU AI Act compliance)."""
+    SOURCE_CHOICES = [
+        ("user", "User"),
+        ("ai_agent", "AI Agent"),
+        ("system", "System"),
+    ]
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default="user")
+    action = models.CharField(max_length=100)
+    object_type = models.CharField(max_length=50)
+    object_id = models.IntegerField()
+    object_str = models.CharField(max_length=255)
+    detail = models.TextField(blank=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="audit_logs")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"[{self.source}] {self.action} on {self.object_type} #{self.object_id}"
+
+
+class SuggestedChange(models.Model):
+    """Human-in-the-loop approval queue for high-value AI suggestions."""
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+    deal = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name="suggested_changes")
+    change_type = models.CharField(max_length=50)
+    current_value = models.CharField(max_length=255)
+    suggested_value = models.CharField(max_length=255)
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="suggested_changes")
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Suggested {self.change_type} for {self.deal}: {self.current_value} → {self.suggested_value}"
+
+
+class InboxMessage(models.Model):
+    """Unified Inbox — aggregates WhatsApp, Email, and CRM notes."""
+    SOURCE_CHOICES = [
+        ("whatsapp", "WhatsApp"),
+        ("email", "Email"),
+        ("crm_note", "CRM Note"),
+    ]
+    DIRECTION_CHOICES = [
+        ("inbound", "Inbound"),
+        ("outbound", "Outbound"),
+    ]
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
+    direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES, default="inbound")
+    contact = models.ForeignKey(Contact, on_delete=models.SET_NULL, null=True, blank=True, related_name="inbox_messages")
+    subject = models.CharField(max_length=255, blank=True)
+    body = models.TextField()
+    timestamp = models.DateTimeField(default=timezone.now)
+    read = models.BooleanField(default=False)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="inbox_messages")
+
+    class Meta:
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"[{self.source}] {self.subject or self.body[:50]}"
+
+
+class AgentRun(models.Model):
+    """Records each autonomous agent execution."""
+    STATUS_CHOICES = [
+        ("running", "Running"),
+        ("completed", "Completed"),
+        ("error", "Error"),
+    ]
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="agent_runs")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="running")
+    actions_taken = models.IntegerField(default=0)
+    summary = models.TextField(blank=True)
+    ran_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-ran_at"]
+
+    def __str__(self):
+        return f"AgentRun {self.ran_at} ({self.status})"

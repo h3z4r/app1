@@ -35,7 +35,42 @@
             <a href="{% url 'activity_list' %}" {% if 'activity' in request.resolver_match.url_name %}class="active"{% endif %}>
                 &#128337; Activities
             </a>
+            <div class="nav-section">AI &amp; Automation</div>
+            <a href="{% url 'unified_inbox' %}" {% if 'inbox' in request.resolver_match.url_name %}class="active"{% endif %}>
+                &#128140; Unified Inbox
+            </a>
+            <a href="{% url 'suggested_changes' %}" {% if 'suggested' in request.resolver_match.url_name %}class="active"{% endif %}>
+                &#9889; Approvals
+                {% if pending_approvals_count %}
+                    <span class="badge-count">{{ pending_approvals_count }}</span>
+                {% endif %}
+            </a>
+            <a href="{% url 'audit_log' %}" {% if request.resolver_match.url_name == 'audit_log' %}class="active"{% endif %}>
+                &#128221; Audit Log
+            </a>
+            <a href="{% url 'leaderboard' %}" {% if request.resolver_match.url_name == 'leaderboard' %}class="active"{% endif %}>
+                &#127942; Leaderboard
+            </a>
         </nav>
+
+        <!-- Agent status indicator -->
+        <div class="agent-status-bar">
+            {% if agent_last_run %}
+                <span class="agent-dot {% if agent_last_run.status == 'completed' %}agent-dot-ok{% elif agent_last_run.status == 'running' %}agent-dot-running{% else %}agent-dot-error{% endif %}"></span>
+                <span class="agent-status-label">
+                    Agent: {{ agent_last_run.status }}
+                    <span class="agent-time">{{ agent_last_run.ran_at|timesince }} ago</span>
+                </span>
+            {% else %}
+                <span class="agent-dot agent-dot-idle"></span>
+                <span class="agent-status-label">Agent: never run</span>
+            {% endif %}
+            <form method="post" action="{% url 'agent_run' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn-agent-run" title="Run agent now">&#9654; Run</button>
+            </form>
+        </div>
+
         <div class="sidebar-footer">
             <div style="margin-bottom:6px;">Signed in as <strong>{{ request.user.username }}</strong></div>
             <a href="{% url 'logout' %}">Sign out</a>

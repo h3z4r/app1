@@ -14,7 +14,7 @@ class CompanyForm(forms.ModelForm):
 class ContactForm(forms.ModelForm):
     class Meta:
         model = Contact
-        fields = ["first_name", "last_name", "email", "phone", "company", "job_title", "notes"]
+        fields = ["first_name", "last_name", "email", "phone", "whatsapp_number", "linkedin_profile_url", "company", "job_title", "notes"]
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 3}),
         }

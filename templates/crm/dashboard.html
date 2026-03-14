@@ -99,6 +99,17 @@
 })();
 </script>
 
+<!-- ── Pending AI Approvals ── -->
+{% if pending_approvals_count %}
+<div class="card approval-banner">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+        &#9889; AI Approvals Needed
+        <a href="{% url 'suggested_changes' %}" class="btn btn-primary btn-sm">Review {{ pending_approvals_count }} suggestion{{ pending_approvals_count|pluralize }}</a>
+    </div>
+    <p style="color:var(--text-muted);margin:0;">The autonomous agent found high-value deals that need your decision before taking action.</p>
+</div>
+{% endif %}
+
 <!-- ── Bottom grid: My Tasks + Recent Deals ── -->
 <div class="dashboard-grid">
     <div class="card">

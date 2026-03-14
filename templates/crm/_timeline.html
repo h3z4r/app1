@@ -22,10 +22,67 @@
         {% if company_id %}<input type="hidden" name="company_id" value="{{ company_id }}">{% endif %}
         {% if deal_id %}<input type="hidden" name="deal_id" value="{{ deal_id }}">{% endif %}
         {{ note_form.body }}
-        <div style="margin-top:8px;">
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
             <button type="submit" class="btn btn-primary btn-sm">Add Note</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="voice-note-btn" title="Record voice note (mock)">&#127908; Voice Note</button>
         </div>
     </form>
+
+    <!-- Voice note modal (mock — transcript typed or pasted) -->
+    <div id="voice-modal" style="display:none;margin-top:12px;padding:12px;background:var(--bg-alt,#f8fafc);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:0.85rem;font-weight:600;margin-bottom:8px;">&#127908; Voice Note — paste or type transcript</div>
+        <textarea id="voice-transcript" rows="3" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);font-size:0.9rem;" placeholder="Paste meeting transcript or dictated text here..."></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" id="voice-submit">Analyse &amp; Save</button>
+            <button class="btn btn-secondary btn-sm" id="voice-cancel">Cancel</button>
+        </div>
+        <div id="voice-result" style="display:none;margin-top:10px;font-size:0.85rem;"></div>
+    </div>
+
+    <script>
+    (function(){
+        const btn    = document.getElementById("voice-note-btn");
+        const modal  = document.getElementById("voice-modal");
+        const cancel = document.getElementById("voice-cancel");
+        const submit = document.getElementById("voice-submit");
+        const result = document.getElementById("voice-result");
+
+        btn.addEventListener("click", () => { modal.style.display = "block"; });
+        cancel.addEventListener("click", () => { modal.style.display = "none"; });
+
+        submit.addEventListener("click", () => {
+            const text = document.getElementById("voice-transcript").value.trim();
+            if (!text) return;
+            submit.disabled = true;
+            submit.textContent = "Saving…";
+
+            const fd = new FormData();
+            fd.append("transcript", text);
+            {% if deal_id %}fd.append("deal_id", "{{ deal_id }}");{% endif %}
+            {% if contact_id %}fd.append("contact_id", "{{ contact_id }}");{% endif %}
+            fd.append("csrfmiddlewaretoken", "{{ csrf_token }}");
+
+            fetch("{% url 'process_voice_note' %}", { method: "POST", body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        result.style.display = "block";
+                        result.innerHTML = `<span style="color:#10b981;">&#10003; Saved!</span>
+                            Sentiment: <strong>${data.sentiment}</strong>
+                            ${data.detected_actions.length ? "· Actions: " + data.detected_actions.join(", ") : ""}
+                            <br><em>${data.summary}</em>`;
+                        submit.textContent = "✓ Saved";
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        result.style.display = "block";
+                        result.innerHTML = `<span style="color:#ef4444;">&#9888; ${data.error}</span>`;
+                        submit.disabled = false;
+                        submit.textContent = "Analyse & Save";
+                    }
+                });
+        });
+    })();
+    </script>
 
     <!-- Activity feed -->
     <div class="timeline" style="margin-top:20px;">
@@ -38,6 +95,7 @@
                 {% elif entry.type == "note" %}&#128203;
                 {% elif entry.type == "task" %}&#10003;
                 {% elif entry.type == "stage_change" %}&#8594;
+                {% elif entry.type == "voice_note" %}&#127908;
                 {% else %}&#8226;
                 {% endif %}
             </div>

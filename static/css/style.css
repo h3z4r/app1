@@ -723,3 +723,194 @@ kbd {
     font-size: 0.75rem;
     font-family: monospace;
 }
+
+/* ── V4 Styles ────────────────────────────────────────────────────────────── */
+
+/* Agent status bar in sidebar */
+.agent-status-bar {
+    padding: 10px 16px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--sidebar-text);
+    flex-wrap: wrap;
+}
+.agent-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.agent-dot-ok      { background: #10b981; }
+.agent-dot-running { background: #f59e0b; animation: pulse 1s infinite; }
+.agent-dot-error   { background: #ef4444; }
+.agent-dot-idle    { background: #475569; }
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+}
+.agent-status-label { flex: 1; }
+.agent-time { color: #a5b4fc; font-size: 0.72rem; }
+.btn-agent-run {
+    background: rgba(79,70,229,0.3);
+    color: #c7d2fe;
+    border: 1px solid rgba(79,70,229,0.5);
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 0.73rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-agent-run:hover { background: var(--primary); color: #fff; }
+
+/* Badge count for sidebar approvals */
+.badge-count {
+    display: inline-block;
+    background: var(--danger);
+    color: #fff;
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-left: 4px;
+}
+
+/* Pending approvals banner on dashboard */
+.approval-banner {
+    border-left: 4px solid #f59e0b;
+}
+
+/* ── Unified Inbox ── */
+.inbox-filter-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.inbox-filter-label { color: var(--text-muted); font-size: 0.85rem; }
+
+.inbox-message-list { display: flex; flex-direction: column; }
+.inbox-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--text);
+    transition: background 0.1s;
+    position: relative;
+}
+.inbox-row:hover { background: #f8fafc; }
+.inbox-unread { background: #f0f4ff; font-weight: 500; }
+
+.inbox-source-badge {
+    display: inline-block;
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.source-whatsapp { background: #dcfce7; color: #166534; }
+.source-email    { background: #dbeafe; color: #1e40af; }
+.source-crm_note { background: #fef3c7; color: #92400e; }
+
+.inbox-content { flex: 1; min-width: 0; }
+.inbox-row-top { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.inbox-contact { font-weight: 600; }
+.inbox-direction { font-size: 0.78rem; color: var(--text-muted); }
+.inbox-time { font-size: 0.78rem; color: var(--text-muted); margin-left: auto; }
+.inbox-subject { font-size: 0.88rem; color: var(--text); margin-top: 2px; }
+.inbox-preview { font-size: 0.83rem; color: var(--text-muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; margin-top: 5px; }
+
+/* Inbox detail */
+.inbox-detail-header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.inbox-detail-contact { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px; }
+.inbox-detail-subject { font-size: 1.2rem; font-weight: 700; margin-bottom: 16px; }
+.inbox-detail-body { font-size: 0.95rem; line-height: 1.7; }
+
+/* Quick reply */
+.quick-reply-block {
+    margin-bottom: 14px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+.quick-reply-text {
+    white-space: pre-wrap;
+    font-family: inherit;
+    font-size: 0.88rem;
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+/* ── Approvals ── */
+.approval-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 14px;
+}
+.approval-header { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.approval-deal-link { font-weight: 700; font-size: 1rem; color: var(--primary); }
+.badge-high-value { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; border-radius: 5px; padding: 2px 8px; font-size: 0.78rem; font-weight: 600; }
+.approval-change { font-size: 0.9rem; margin-bottom: 6px; }
+.approval-label { font-weight: 600; }
+.approval-from { background: #fee2e2; color: #b91c1c; padding: 1px 6px; border-radius: 4px; }
+.approval-to   { background: #dcfce7; color: #166534; padding: 1px 6px; border-radius: 4px; }
+.approval-reason { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; line-height: 1.5; }
+.approval-meta { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; }
+.approval-actions { display: flex; align-items: center; }
+.badge-approved { background: #dcfce7; color: #166534; border-radius: 5px; padding: 2px 8px; font-size: 0.78rem; font-weight: 600; }
+.badge-rejected { background: #fee2e2; color: #b91c1c; border-radius: 5px; padding: 2px 8px; font-size: 0.78rem; font-weight: 600; }
+.badge-pending  { background: #fef3c7; color: #92400e; border-radius: 5px; padding: 2px 8px; font-size: 0.78rem; font-weight: 600; }
+
+/* ── Audit Log ── */
+.audit-row { transition: background 0.1s; }
+.audit-row:hover { background: #f8fafc; }
+.audit-source-ai_agent { border-left: 3px solid #818cf8; }
+.audit-source-user { border-left: 3px solid #10b981; }
+.audit-time { white-space: nowrap; font-size: 0.83rem; color: var(--text-muted); }
+.audit-action { font-family: monospace; font-size: 0.82rem; }
+.audit-object-type { text-transform: capitalize; font-weight: 600; color: var(--text-muted); font-size: 0.8rem; }
+.audit-object-str { color: var(--text-muted); font-size: 0.83rem; }
+.audit-detail { font-size: 0.82rem; color: var(--text-muted); max-width: 320px; }
+.badge-source {
+    display: inline-block;
+    border-radius: 5px;
+    padding: 2px 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.source-ai_agent { background: #ede9fe; color: #5b21b6; }
+.source-user     { background: #dcfce7; color: #166534; }
+.source-system   { background: #f1f5f9; color: #475569; }
+
+/* ── Leaderboard ── */
+.leaderboard-top { background: #fffbeb; }
+.leaderboard-rank { font-size: 1.2rem; text-align: center; width: 40px; }
+.leaderboard-won  { color: #10b981; font-weight: 700; }
+.leaderboard-lost { color: #ef4444; font-weight: 700; }
+.win-rate-bar-wrap {
+    display: inline-block;
+    width: 100px;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+.win-rate-bar {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 4px;
+    transition: width 0.4s;
+}
+.win-rate-label { font-weight: 600; font-size: 0.88rem; }

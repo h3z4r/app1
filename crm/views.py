@@ -7,11 +7,12 @@ from django.db.models import Q, Sum, Count
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
-from .models import Company, Contact, Deal, Activity, Task
+from .models import Company, Contact, Deal, Activity, Task, AuditLog, SuggestedChange, InboxMessage, AgentRun
 from .forms import CompanyForm, ContactForm, DealForm, ActivityForm, NoteForm, TaskForm
 from .services.ai_logic import (
     generate_suggestions, parse_command, execute_command,
-    enrich_company, extract_domain,
+    enrich_company, extract_domain, suggest_quick_reply,
+    process_voice_transcript, compute_user_win_rate, compute_speed_to_lead,
 )
 
 
@@ -486,3 +487,198 @@ def task_delete(request, pk):
         messages.success(request, "Task deleted.")
         return redirect("task_list")
     return render(request, "crm/confirm_delete.html", {"object": task, "type": "Task"})
+
+
+# ---------------------------------------------------------------------------
+# V4 — Autonomous Agent trigger
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_POST
+def agent_run(request):
+    from .agents.sales_agent import run_sales_agent
+    agent_run_obj = AgentRun.objects.create(owner=request.user, status="running")
+    try:
+        result = run_sales_agent(request.user)
+        total = len(result["actions"]) + len(result["suggested"])
+        agent_run_obj.status = "completed"
+        agent_run_obj.actions_taken = total
+        agent_run_obj.summary = "\n".join(result["actions"] + result["suggested"])
+        agent_run_obj.save()
+        messages.success(request, f"Agent completed — {total} action(s) taken or queued.")
+    except Exception as e:
+        agent_run_obj.status = "error"
+        agent_run_obj.summary = str(e)
+        agent_run_obj.save()
+        messages.error(request, f"Agent error: {e}")
+    return redirect("dashboard")
+
+
+# ---------------------------------------------------------------------------
+# V4 — Unified Inbox
+# ---------------------------------------------------------------------------
+
+@login_required
+def unified_inbox(request):
+    source_filter = request.GET.get("source", "")
+    msgs = InboxMessage.objects.filter(owner=request.user).select_related("contact")
+    if source_filter:
+        msgs = msgs.filter(source=source_filter)
+    unread_count = InboxMessage.objects.filter(owner=request.user, read=False).count()
+    return render(request, "crm/unified_inbox.html", {
+        "messages": msgs,
+        "source_filter": source_filter,
+        "unread_count": unread_count,
+        "source_choices": InboxMessage.SOURCE_CHOICES,
+    })
+
+
+@login_required
+def inbox_message_detail(request, pk):
+    msg = get_object_or_404(InboxMessage, pk=pk, owner=request.user)
+    if not msg.read:
+        msg.read = True
+        msg.save(update_fields=["read"])
+    quick_replies = []
+    if msg.direction == "inbound":
+        name = msg.contact.first_name if msg.contact else "there"
+        quick_replies = suggest_quick_reply(msg.body, name)
+    return render(request, "crm/inbox_message_detail.html", {
+        "msg": msg,
+        "quick_replies": quick_replies,
+    })
+
+
+# ---------------------------------------------------------------------------
+# V4 — Human-in-the-Loop approval queue
+# ---------------------------------------------------------------------------
+
+@login_required
+def suggested_changes(request):
+    pending = SuggestedChange.objects.filter(owner=request.user, status="pending").select_related("deal")
+    reviewed = SuggestedChange.objects.filter(owner=request.user).exclude(status="pending").select_related("deal")[:20]
+    return render(request, "crm/suggested_changes.html", {
+        "pending": pending,
+        "reviewed": reviewed,
+    })
+
+
+@login_required
+@require_POST
+def suggested_change_review(request, pk):
+    change = get_object_or_404(SuggestedChange, pk=pk, owner=request.user, status="pending")
+    action = request.POST.get("action")  # "approve" or "reject"
+
+    if action == "approve":
+        if change.change_type == "stage_change":
+            change.deal.stage = change.suggested_value
+            change.deal.save()
+            Activity.objects.create(
+                type="stage_change",
+                subject=f"Stage changed to {change.suggested_value} (approved suggestion)",
+                deal=change.deal,
+                owner=request.user,
+                is_system=True,
+            )
+            AuditLog.objects.create(
+                source="user",
+                action="approved_suggestion",
+                object_type="deal",
+                object_id=change.deal.pk,
+                object_str=str(change.deal),
+                detail=f"User approved AI suggestion: {change.current_value} → {change.suggested_value}.",
+                user=request.user,
+            )
+        change.status = "approved"
+        messages.success(request, f'Approved: moved "{change.deal}" to {change.suggested_value}.')
+    elif action == "reject":
+        change.status = "rejected"
+        AuditLog.objects.create(
+            source="user",
+            action="rejected_suggestion",
+            object_type="deal",
+            object_id=change.deal.pk,
+            object_str=str(change.deal),
+            detail=f"User rejected AI suggestion: {change.current_value} → {change.suggested_value}.",
+            user=request.user,
+        )
+        messages.info(request, f'Rejected suggestion for "{change.deal}".')
+    else:
+        messages.error(request, "Invalid action.")
+        return redirect("suggested_changes")
+
+    change.reviewed_at = timezone.now()
+    change.save()
+    return redirect("suggested_changes")
+
+
+# ---------------------------------------------------------------------------
+# V4 — Audit Log
+# ---------------------------------------------------------------------------
+
+@login_required
+def audit_log(request):
+    logs = AuditLog.objects.filter(user=request.user).select_related("user")[:200]
+    return render(request, "crm/audit_log.html", {"logs": logs})
+
+
+# ---------------------------------------------------------------------------
+# V4 — Voice note processing
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_POST
+def process_voice_note(request):
+    transcript = request.POST.get("transcript", "").strip()
+    deal_id = request.POST.get("deal_id")
+    contact_id = request.POST.get("contact_id")
+
+    if not transcript:
+        return JsonResponse({"error": "No transcript provided."}, status=400)
+
+    parsed = process_voice_transcript(transcript)
+
+    activity = Activity.objects.create(
+        type="voice_note",
+        subject="Voice Note",
+        body=parsed["summary"],
+        transcript=transcript,
+        sentiment=parsed["sentiment"],
+        deal_id=deal_id or None,
+        contact_id=contact_id or None,
+        owner=request.user,
+        is_system=False,
+    )
+    return JsonResponse({
+        "ok": True,
+        "activity_id": activity.pk,
+        "sentiment": parsed["sentiment"],
+        "detected_actions": parsed["detected_actions"],
+        "summary": parsed["summary"],
+    })
+
+
+# ---------------------------------------------------------------------------
+# V4 — Leaderboard (win rate + speed to lead)
+# ---------------------------------------------------------------------------
+
+@login_required
+def leaderboard(request):
+    from django.contrib.auth.models import User
+    users = User.objects.filter(is_active=True)
+    board = []
+    for u in users:
+        win_rate = compute_user_win_rate(u)
+        speed = compute_speed_to_lead(u)
+        won_count = Deal.objects.filter(owner=u, stage="won").count()
+        lost_count = Deal.objects.filter(owner=u, stage="lost").count()
+        board.append({
+            "user": u,
+            "win_rate": win_rate,
+            "win_rate_pct": round(win_rate * 100, 1),
+            "speed_to_lead": speed,
+            "won": won_count,
+            "lost": lost_count,
+        })
+    board.sort(key=lambda x: x["win_rate"], reverse=True)
+    return render(request, "crm/leaderboard.html", {"board": board})

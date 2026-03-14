@@ -408,3 +408,113 @@ def execute_command(action_data, user):
         return {"ok": True, "redirect": data.get("url", "/")}
 
     return {"ok": False, "error": "Unknown action"}
+
+
+# ---------------------------------------------------------------------------
+# V4 — Voice transcript processing
+# ---------------------------------------------------------------------------
+
+VOICE_ACTION_PATTERNS = [
+    (re.compile(r"follow[\s-]?up", re.I), "follow_up"),
+    (re.compile(r"send (a |an )?(quote|proposal|email)", re.I), "send_proposal"),
+    (re.compile(r"schedule (a |an )?(call|meeting|demo)", re.I), "schedule_meeting"),
+    (re.compile(r"(close|won|signed)", re.I), "mark_won"),
+]
+
+def process_voice_transcript(transcript):
+    """
+    Parse a voice note transcript into structured data.
+    Returns:
+        {
+            "sentiment": str,
+            "detected_actions": [str],
+            "summary": str,
+        }
+    Swap body for a real speech-to-text / LLM call later.
+    """
+    sentiment = analyze_sentiment(transcript)
+    detected = []
+    for pattern, label in VOICE_ACTION_PATTERNS:
+        if pattern.search(transcript):
+            detected.append(label)
+
+    # Build a short summary (first 200 chars, clean up whitespace)
+    clean = " ".join(transcript.split())
+    summary = clean[:200] + ("..." if len(clean) > 200 else "")
+
+    return {
+        "sentiment": sentiment,
+        "detected_actions": detected,
+        "summary": summary,
+    }
+
+
+# ---------------------------------------------------------------------------
+# V4 — Quick reply suggestions for inbox
+# ---------------------------------------------------------------------------
+
+QUICK_REPLIES = {
+    "concerned": [
+        "Hi {name}, thank you for sharing your concerns. I'd love to address them on a quick call — does this week work for you?",
+        "Hi {name}, I hear you. Let me look into this right away and come back with options.",
+    ],
+    "positive": [
+        "Hi {name}, great to hear from you! I'll get everything moving from our side straight away.",
+        "Hi {name}, wonderful — let me send over the next steps right now.",
+    ],
+    "neutral": [
+        "Hi {name}, thanks for reaching out. Let me know if you need anything from our side.",
+        "Hi {name}, happy to help — what would be the best next step for you?",
+    ],
+}
+
+def suggest_quick_reply(message_body, contact_first_name="there"):
+    """
+    Given an inbound message body, return 2 suggested reply strings.
+    """
+    sentiment = analyze_sentiment(message_body)
+    templates = QUICK_REPLIES.get(sentiment, QUICK_REPLIES["neutral"])
+    return [t.format(name=contact_first_name) for t in templates]
+
+
+# ---------------------------------------------------------------------------
+# V4 — User win-rate and speed-to-lead metrics (leaderboard)
+# ---------------------------------------------------------------------------
+
+def compute_user_win_rate(user):
+    """
+    Returns win rate as a float 0.0–1.0.
+    Only counts closed (won + lost) deals.
+    """
+    from ..models import Deal as DealModel
+    closed = DealModel.objects.filter(owner=user, stage__in=["won", "lost"])
+    total = closed.count()
+    if total == 0:
+        return 0.0
+    won = closed.filter(stage="won").count()
+    return round(won / total, 4)
+
+
+def compute_speed_to_lead(user):
+    """
+    Average days from deal created_at to first manual activity.
+    Returns float (days) or None if no data.
+    """
+    from ..models import Deal as DealModel, Activity as ActivityModel
+    import statistics
+
+    deals = DealModel.objects.filter(owner=user).prefetch_related("activities")
+    deltas = []
+    for deal in deals:
+        first_activity = (
+            deal.activities
+            .filter(is_system=False)
+            .order_by("created_at")
+            .first()
+        )
+        if first_activity:
+            delta = (first_activity.created_at - deal.created_at).total_seconds() / 86400
+            deltas.append(delta)
+    if not deltas:
+        return None
+    return round(statistics.mean(deltas), 1)

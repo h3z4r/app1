@@ -1,0 +1,53 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Unified Inbox - CRM{% endblock %}
+{% block page_title %}Unified Inbox{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'unified_inbox' %}" class="btn btn-secondary btn-sm">&#8635; Refresh</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="inbox-filter-bar">
+    <span class="inbox-filter-label">Filter by source:</span>
+    <a href="{% url 'unified_inbox' %}" class="btn btn-sm {% if not source_filter %}btn-primary{% else %}btn-secondary{% endif %}">All</a>
+    {% for key, label in source_choices %}
+    <a href="?source={{ key }}" class="btn btn-sm {% if source_filter == key %}btn-primary{% else %}btn-secondary{% endif %}">{{ label }}</a>
+    {% endfor %}
+    {% if unread_count %}
+    <span class="badge-count" style="margin-left:auto;">{{ unread_count }} unread</span>
+    {% endif %}
+</div>
+
+<div class="card">
+    {% if messages %}
+    <div class="inbox-message-list">
+        {% for msg in messages %}
+        <a href="{% url 'inbox_message_detail' msg.pk %}" class="inbox-row {% if not msg.read %}inbox-unread{% endif %}">
+            <span class="inbox-source-badge source-{{ msg.source }}">
+                {% if msg.source == 'whatsapp' %}&#128242;{% elif msg.source == 'email' %}&#9993;{% else %}&#128203;{% endif %}
+                {{ msg.get_source_display }}
+            </span>
+            <div class="inbox-content">
+                <div class="inbox-row-top">
+                    <span class="inbox-contact">{{ msg.contact.full_name|default:"Unknown" }}</span>
+                    <span class="inbox-direction">{{ msg.get_direction_display }}</span>
+                    <span class="inbox-time">{{ msg.timestamp|date:"M d, H:i" }}</span>
+                </div>
+                {% if msg.subject %}<div class="inbox-subject">{{ msg.subject }}</div>{% endif %}
+                <div class="inbox-preview">{{ msg.body|truncatechars:120 }}</div>
+            </div>
+            {% if not msg.read %}<span class="unread-dot"></span>{% endif %}
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+        <p>&#128140; No messages yet.</p>
+        <p style="color:var(--text-muted);font-size:0.9rem;">Messages from WhatsApp, email, and CRM notes will appear here.</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

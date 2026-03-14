@@ -1,0 +1,73 @@
+{% extends "crm/base.html" %}
+
+{% block title %}AI Approvals - CRM{% endblock %}
+{% block page_title %}AI Approvals{% endblock %}
+
+{% block content %}
+
+{% if pending %}
+<div class="card">
+    <div class="card-title">&#9889; Pending — Requires Your Decision</div>
+    {% for change in pending %}
+    <div class="approval-card">
+        <div class="approval-header">
+            <a href="{% url 'deal_detail' change.deal.pk %}" class="approval-deal-link">{{ change.deal }}</a>
+            {% if change.deal.is_high_value %}
+            <span class="badge badge-high-value">High Value ${{ change.deal.value|floatformat:0 }}</span>
+            {% endif %}
+        </div>
+        <div class="approval-change">
+            <span class="approval-label">{{ change.get_change_type_display|default:change.change_type }}</span>:
+            <span class="approval-from">{{ change.current_value }}</span>
+            &#8594;
+            <span class="approval-to">{{ change.suggested_value }}</span>
+        </div>
+        <div class="approval-reason">{{ change.reason }}</div>
+        <div class="approval-meta">Suggested {{ change.created_at|date:"M d, Y H:i" }}</div>
+
+        <div class="approval-actions">
+            <form method="post" action="{% url 'suggested_change_review' change.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" name="action" value="approve" class="btn btn-primary btn-sm">&#10003; Approve</button>
+            </form>
+            <form method="post" action="{% url 'suggested_change_review' change.pk %}" style="display:inline;margin-left:8px;">
+                {% csrf_token %}
+                <button type="submit" name="action" value="reject" class="btn btn-secondary btn-sm">&#10007; Reject</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="empty">
+        <p>&#10003; No pending approvals.</p>
+        <p style="color:var(--text-muted);">The agent will queue high-value suggestions here when you run it next.</p>
+    </div>
+</div>
+{% endif %}
+
+{% if reviewed %}
+<div class="card">
+    <div class="card-title" style="color:var(--text-muted);">Recently Reviewed</div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Deal</th><th>Change</th><th>Decision</th><th>Reviewed</th></tr>
+            </thead>
+            <tbody>
+                {% for change in reviewed %}
+                <tr>
+                    <td><a href="{% url 'deal_detail' change.deal.pk %}">{{ change.deal }}</a></td>
+                    <td>{{ change.current_value }} &#8594; {{ change.suggested_value }}</td>
+                    <td><span class="badge badge-{{ change.status }}">{{ change.get_status_display }}</span></td>
+                    <td>{{ change.reviewed_at|date:"M d, Y"|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

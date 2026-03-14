@@ -1,0 +1,53 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Audit Log - CRM{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-title">&#128221; Agent &amp; User Action Log</div>
+    <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:16px;">
+        All AI agent actions are recorded here for EU AI Act compliance and full transparency.
+    </p>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>When</th>
+                    <th>Source</th>
+                    <th>Action</th>
+                    <th>Object</th>
+                    <th>Detail</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr class="audit-row audit-source-{{ log.source }}">
+                    <td class="audit-time" title="{{ log.created_at }}">{{ log.created_at|date:"M d, H:i" }}</td>
+                    <td>
+                        <span class="badge-source source-{{ log.source }}">
+                            {% if log.source == 'ai_agent' %}&#129302; AI Agent
+                            {% elif log.source == 'user' %}&#9786; User
+                            {% else %}&#9881; System
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td class="audit-action">{{ log.action }}</td>
+                    <td>
+                        <span class="audit-object-type">{{ log.object_type }}</span>
+                        #{{ log.object_id }}
+                        <span class="audit-object-str">{{ log.object_str|truncatechars:30 }}</span>
+                    </td>
+                    <td class="audit-detail">{{ log.detail|truncatechars:80 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No audit entries yet. Run the agent to see activity here.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
