@@ -1,0 +1,60 @@
+{% load static %}
+{% comment %}
+  Reusable timeline partial.
+  Required context:
+    timeline      - queryset of Activity objects
+    note_form     - NoteForm instance
+    next_url      - redirect URL after note submit
+  Optional (pass the relevant FK value):
+    contact_id    - int
+    company_id    - int
+    deal_id       - int
+{% endcomment %}
+
+<div class="card">
+    <div class="card-title">Timeline</div>
+
+    <!-- Quick note form -->
+    <form action="{% url 'add_note' %}" method="post" class="note-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next_url }}">
+        {% if contact_id %}<input type="hidden" name="contact_id" value="{{ contact_id }}">{% endif %}
+        {% if company_id %}<input type="hidden" name="company_id" value="{{ company_id }}">{% endif %}
+        {% if deal_id %}<input type="hidden" name="deal_id" value="{{ deal_id }}">{% endif %}
+        {{ note_form.body }}
+        <div style="margin-top:8px;">
+            <button type="submit" class="btn btn-primary btn-sm">Add Note</button>
+        </div>
+    </form>
+
+    <!-- Activity feed -->
+    <div class="timeline" style="margin-top:20px;">
+        {% for entry in timeline %}
+        <div class="timeline-item {% if entry.is_system %}timeline-system{% endif %}">
+            <div class="timeline-icon type-{{ entry.type }}">
+                {% if entry.type == "call" %}&#128222;
+                {% elif entry.type == "email" %}&#9993;
+                {% elif entry.type == "meeting" %}&#128197;
+                {% elif entry.type == "note" %}&#128203;
+                {% elif entry.type == "task" %}&#10003;
+                {% elif entry.type == "stage_change" %}&#8594;
+                {% else %}&#8226;
+                {% endif %}
+            </div>
+            <div class="timeline-body">
+                <div class="timeline-subject">{{ entry.subject }}</div>
+                {% if entry.body %}
+                    <div class="timeline-text">{{ entry.body }}</div>
+                {% endif %}
+                <div class="timeline-meta">
+                    {{ entry.created_at|date:"M d, Y H:i" }}
+                    {% if entry.owner %}&middot; {{ entry.owner.username }}{% endif %}
+                    {% if entry.is_system %}&middot; <em>system</em>{% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+            <p style="color:var(--text-muted);font-size:0.9rem;">No activity yet. Add a note above.</p>
+        {% endfor %}
+    </div>
+</div>

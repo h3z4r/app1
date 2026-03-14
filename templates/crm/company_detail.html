@@ -55,9 +55,7 @@
                 <p style="color:var(--text-muted);font-size:0.9rem;">No contacts linked.</p>
             {% endif %}
         </div>
-    </div>
 
-    <div>
         <div class="card">
             <div class="card-title">Deals</div>
             {% if company.deals.all %}
@@ -74,6 +72,12 @@
                 <p style="color:var(--text-muted);font-size:0.9rem;">No deals linked.</p>
             {% endif %}
         </div>
+    </div>
+
+    <div>
+        {% with next_url=request.path company_id=company.pk %}
+            {% include "crm/_timeline.html" %}
+        {% endwith %}
     </div>
 </div>
 {% endblock %}

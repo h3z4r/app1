@@ -1,5 +1,5 @@
 from django import forms
-from .models import Company, Contact, Deal, Activity
+from .models import Company, Contact, Deal, Activity, Task
 
 
 class CompanyForm(forms.ModelForm):
@@ -33,8 +33,25 @@ class DealForm(forms.ModelForm):
 class ActivityForm(forms.ModelForm):
     class Meta:
         model = Activity
-        fields = ["type", "subject", "body", "contact", "deal", "due_date", "completed"]
+        fields = ["type", "subject", "body", "contact", "company", "deal", "due_date", "completed"]
         widgets = {
             "due_date": forms.DateTimeInput(attrs={"type": "datetime-local"}),
             "body": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
+class NoteForm(forms.Form):
+    body = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Add a note..."}),
+        label="",
+    )
+
+
+class TaskForm(forms.ModelForm):
+    class Meta:
+        model = Task
+        fields = ["title", "description", "priority", "status", "due_date", "contact", "deal"]
+        widgets = {
+            "due_date": forms.DateInput(attrs={"type": "date"}),
+            "description": forms.Textarea(attrs={"rows": 3}),
         }

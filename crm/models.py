@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 class Company(models.Model):
@@ -79,15 +80,18 @@ class Activity(models.Model):
         ("meeting", "Meeting"),
         ("note", "Note"),
         ("task", "Task"),
+        ("stage_change", "Stage Change"),
     ]
 
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     subject = models.CharField(max_length=255)
     body = models.TextField(blank=True)
     contact = models.ForeignKey(Contact, on_delete=models.SET_NULL, null=True, blank=True, related_name="activities")
+    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="activities")
     deal = models.ForeignKey(Deal, on_delete=models.SET_NULL, null=True, blank=True, related_name="activities")
     due_date = models.DateTimeField(null=True, blank=True)
     completed = models.BooleanField(default=False)
+    is_system = models.BooleanField(default=False)  # True = auto-logged by signals
     created_at = models.DateTimeField(auto_now_add=True)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="activities")
 
@@ -97,3 +101,45 @@ class Activity(models.Model):
 
     def __str__(self):
         return f"{self.get_type_display()} - {self.subject}"
+
+
+class Task(models.Model):
+    PRIORITY_CHOICES = [
+        ("low", "Low"),
+        ("medium", "Medium"),
+        ("high", "High"),
+    ]
+    STATUS_CHOICES = [
+        ("todo", "To Do"),
+        ("in_progress", "In Progress"),
+        ("done", "Done"),
+    ]
+
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default="medium")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="todo")
+    due_date = models.DateField(null=True, blank=True)
+    contact = models.ForeignKey(Contact, on_delete=models.SET_NULL, null=True, blank=True, related_name="tasks")
+    deal = models.ForeignKey(Deal, on_delete=models.SET_NULL, null=True, blank=True, related_name="tasks")
+    created_at = models.DateTimeField(auto_now_add=True)
+    owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="tasks")
+
+    class Meta:
+        ordering = ["due_date", "-priority"]
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def due_status(self):
+        """Returns 'overdue', 'soon', or 'ok' based on due_date."""
+        if not self.due_date or self.status == "done":
+            return "ok"
+        today = timezone.now().date()
+        delta = (self.due_date - today).days
+        if delta < 0:
+            return "overdue"
+        if delta <= 3:
+            return "soon"
+        return "ok"

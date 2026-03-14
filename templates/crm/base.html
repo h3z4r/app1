@@ -15,8 +15,11 @@
                 &#9632; Dashboard
             </a>
             <div class="nav-section">Sales</div>
-            <a href="{% url 'deal_list' %}" {% if 'deal' in request.resolver_match.url_name %}class="active"{% endif %}>
-                &#11044; Deals
+            <a href="{% url 'deal_kanban' %}" {% if request.resolver_match.url_name == 'deal_kanban' %}class="active"{% endif %}>
+                &#9635; Kanban Board
+            </a>
+            <a href="{% url 'deal_list' %}" {% if request.resolver_match.url_name == 'deal_list' %}class="active"{% endif %}>
+                &#11044; Deals List
             </a>
             <div class="nav-section">People</div>
             <a href="{% url 'contact_list' %}" {% if 'contact' in request.resolver_match.url_name %}class="active"{% endif %}>
@@ -25,7 +28,10 @@
             <a href="{% url 'company_list' %}" {% if 'company' in request.resolver_match.url_name %}class="active"{% endif %}>
                 &#127970; Companies
             </a>
-            <div class="nav-section">Track</div>
+            <div class="nav-section">Work</div>
+            <a href="{% url 'task_list' %}" {% if 'task' in request.resolver_match.url_name %}class="active"{% endif %}>
+                &#10003; Tasks
+            </a>
             <a href="{% url 'activity_list' %}" {% if 'activity' in request.resolver_match.url_name %}class="active"{% endif %}>
                 &#128337; Activities
             </a>
@@ -39,7 +45,13 @@
     <div class="main">
         <header class="topbar">
             <span class="topbar-title">{% block page_title %}{% endblock %}</span>
-            <div>{% block topbar_actions %}{% endblock %}</div>
+            <div class="topbar-right">
+                <form action="{% url 'global_search' %}" method="get" class="global-search-form">
+                    <input type="text" name="q" placeholder="Search contacts, companies, deals..." value="{{ request.GET.q|default:'' }}">
+                    <button type="submit">&#128269;</button>
+                </form>
+                <div>{% block topbar_actions %}{% endblock %}</div>
+            </div>
         </header>
 
         <div class="content">

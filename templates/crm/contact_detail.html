@@ -61,22 +61,30 @@
                 <p style="color:var(--text-muted);font-size:0.9rem;">No deals linked.</p>
             {% endif %}
         </div>
+
+        <div class="card">
+            <div class="card-title">Tasks</div>
+            {% if contact.tasks.all %}
+                {% for task in contact.tasks.all %}
+                <div class="task-row">
+                    <span class="due-dot due-{{ task.due_status }}"></span>
+                    <div class="task-row-content">
+                        <a href="{% url 'task_edit' task.pk %}">{{ task.title }}</a>
+                        <span class="task-meta">{{ task.get_status_display }}{% if task.due_date %} &middot; Due {{ task.due_date }}{% endif %}</span>
+                    </div>
+                    <span class="badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color:var(--text-muted);font-size:0.9rem;">No tasks linked.</p>
+            {% endif %}
+        </div>
     </div>
 
     <div>
-        <div class="card">
-            <div class="card-title">Activities</div>
-            {% if contact.activities.all %}
-                {% for activity in contact.activities.all %}
-                    <div style="padding:10px 0;border-bottom:1px solid var(--border);">
-                        <div style="font-size:0.8rem;color:var(--text-muted);">{{ activity.get_type_display }} &middot; {{ activity.created_at|date:"M d, Y" }}</div>
-                        <div style="font-size:0.9rem;margin-top:4px;">{{ activity.subject }}</div>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p style="color:var(--text-muted);font-size:0.9rem;">No activities yet.</p>
-            {% endif %}
-        </div>
+        {% with next_url=request.path contact_id=contact.pk %}
+            {% include "crm/_timeline.html" %}
+        {% endwith %}
     </div>
 </div>
 {% endblock %}

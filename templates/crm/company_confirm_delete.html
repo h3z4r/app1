@@ -1,0 +1,57 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Delete Company - CRM{% endblock %}
+{% block page_title %}Delete Company{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:520px;">
+    <div class="card-title" style="color:var(--danger);">Delete "{{ company.name }}"</div>
+
+    {% if contact_count > 0 %}
+    <div class="alert alert-error" style="margin-bottom:20px;">
+        This company has <strong>{{ contact_count }} contact{{ contact_count|pluralize }}</strong> linked to it.
+        Choose what to do with them:
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div style="margin-bottom:20px;">
+            <label class="radio-option">
+                <input type="radio" name="action" value="nullify" checked>
+                <div>
+                    <strong>Keep contacts</strong>
+                    <p style="color:var(--text-muted);font-size:0.85rem;margin-top:2px;">
+                        Contacts remain but are unlinked from this company.
+                    </p>
+                </div>
+            </label>
+            <label class="radio-option" style="margin-top:10px;">
+                <input type="radio" name="action" value="cascade">
+                <div>
+                    <strong>Delete contacts too</strong>
+                    <p style="color:var(--danger);font-size:0.85rem;margin-top:2px;">
+                        Permanently deletes all {{ contact_count }} linked contact{{ contact_count|pluralize }}. Cannot be undone.
+                    </p>
+                </div>
+            </label>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-danger">Delete Company</button>
+            <a href="{% url 'company_detail' company.pk %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+    {% else %}
+    <p style="margin-bottom:24px;color:var(--text-muted);">
+        Are you sure you want to delete <strong>{{ company.name }}</strong>? This action cannot be undone.
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="nullify">
+        <div class="form-actions">
+            <button type="submit" class="btn btn-danger">Yes, Delete</button>
+            <a href="{% url 'company_detail' company.pk %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

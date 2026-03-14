@@ -23,15 +23,46 @@
     </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+<div class="dashboard-grid">
+    <!-- My Tasks widget -->
     <div class="card">
-        <div class="card-title">Recent Deals</div>
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+            My Tasks
+            <a href="{% url 'task_create' %}" class="btn btn-primary btn-sm">+ New</a>
+        </div>
+        {% if my_tasks %}
+            {% for task in my_tasks %}
+            <div class="task-row">
+                <span class="due-dot due-{{ task.due_status }}"></span>
+                <div class="task-row-content">
+                    <a href="{% url 'task_edit' task.pk %}">{{ task.title }}</a>
+                    <span class="task-meta">
+                        {% if task.due_date %}Due {{ task.due_date }}{% endif %}
+                        {% if task.contact %}&middot; {{ task.contact.full_name }}{% endif %}
+                        {% if task.deal %}&middot; {{ task.deal }}{% endif %}
+                    </span>
+                </div>
+                <span class="badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
+            </div>
+            {% endfor %}
+            <div style="margin-top:12px;">
+                <a href="{% url 'task_list' %}" class="btn btn-secondary btn-sm">View all tasks</a>
+            </div>
+        {% else %}
+            <div class="empty"><p>No open tasks.</p><a href="{% url 'task_create' %}" class="btn btn-primary">Create task</a></div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Deals -->
+    <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+            Recent Deals
+            <a href="{% url 'deal_kanban' %}" class="btn btn-secondary btn-sm">Kanban &#8594;</a>
+        </div>
         {% if recent_deals %}
             <div class="table-wrap">
                 <table>
-                    <thead>
-                        <tr><th>Title</th><th>Stage</th><th>Value</th></tr>
-                    </thead>
+                    <thead><tr><th>Title</th><th>Stage</th><th>Value</th></tr></thead>
                     <tbody>
                         {% for deal in recent_deals %}
                         <tr>
@@ -48,27 +79,31 @@
         {% endif %}
     </div>
 
-    <div class="card">
-        <div class="card-title">Recent Activities</div>
+    <!-- Recent Activities -->
+    <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-title">Recent Activity</div>
         {% if recent_activities %}
             <div class="table-wrap">
                 <table>
-                    <thead>
-                        <tr><th>Type</th><th>Subject</th><th>Contact</th></tr>
-                    </thead>
+                    <thead><tr><th>Type</th><th>Subject</th><th>Contact</th><th>Deal</th><th>Date</th></tr></thead>
                     <tbody>
                         {% for activity in recent_activities %}
                         <tr>
-                            <td>{{ activity.get_type_display }}</td>
+                            <td>
+                                {% if activity.is_system %}<span style="color:var(--text-muted);font-size:0.8rem;">&#9881;</span>{% endif %}
+                                {{ activity.get_type_display }}
+                            </td>
                             <td>{{ activity.subject }}</td>
                             <td>{% if activity.contact %}{{ activity.contact.full_name }}{% else %}-{% endif %}</td>
+                            <td>{% if activity.deal %}{{ activity.deal }}{% else %}-{% endif %}</td>
+                            <td style="color:var(--text-muted);font-size:0.85rem;">{{ activity.created_at|date:"M d, Y" }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         {% else %}
-            <div class="empty"><p>No activities yet.</p><a href="{% url 'activity_create' %}" class="btn btn-primary">Log Activity</a></div>
+            <div class="empty"><p>No activities yet.</p></div>
         {% endif %}
     </div>
 </div>

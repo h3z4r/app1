@@ -1,0 +1,90 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Search: {{ q }} - CRM{% endblock %}
+{% block page_title %}Search Results{% endblock %}
+
+{% block content %}
+{% if q %}
+    <p style="color:var(--text-muted);margin-bottom:24px;">
+        Results for <strong>"{{ q }}"</strong>
+        &mdash; {{ contacts|length }} contact{{ contacts|length|pluralize }},
+        {{ companies|length }} compan{{ companies|length|pluralize:"y,ies" }},
+        {{ deals|length }} deal{{ deals|length|pluralize }}
+    </p>
+
+    <!-- Contacts -->
+    {% if contacts %}
+    <div class="card">
+        <div class="card-title">Contacts</div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Name</th><th>Email</th><th>Company</th></tr></thead>
+                <tbody>
+                    {% for c in contacts %}
+                    <tr>
+                        <td><a href="{% url 'contact_detail' c.pk %}">{{ c.full_name }}</a></td>
+                        <td>{{ c.email|default:"-" }}</td>
+                        <td>{% if c.company %}{{ c.company }}{% else %}-{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Companies -->
+    {% if companies %}
+    <div class="card">
+        <div class="card-title">Companies</div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Name</th><th>Industry</th><th>Email</th></tr></thead>
+                <tbody>
+                    {% for co in companies %}
+                    <tr>
+                        <td><a href="{% url 'company_detail' co.pk %}">{{ co.name }}</a></td>
+                        <td>{{ co.industry|default:"-" }}</td>
+                        <td>{{ co.email|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Deals -->
+    {% if deals %}
+    <div class="card">
+        <div class="card-title">Deals</div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Title</th><th>Stage</th><th>Value</th><th>Contact</th></tr></thead>
+                <tbody>
+                    {% for d in deals %}
+                    <tr>
+                        <td><a href="{% url 'deal_detail' d.pk %}">{{ d.title }}</a></td>
+                        <td><span class="badge badge-{{ d.stage }}">{{ d.get_stage_display }}</span></td>
+                        <td>${{ d.value|floatformat:0 }}</td>
+                        <td>{% if d.contact %}{{ d.contact.full_name }}{% else %}-{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not contacts and not companies and not deals %}
+        <div class="card">
+            <div class="empty"><p>No results found for "{{ q }}".</p></div>
+        </div>
+    {% endif %}
+
+{% else %}
+    <div class="card">
+        <div class="empty"><p>Enter a search term above.</p></div>
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "crm/base.html" %}
+
+{% block title %}Tasks - CRM{% endblock %}
+{% block page_title %}Tasks{% endblock %}
+{% block topbar_actions %}
+    <a href="{% url 'task_create' %}" class="btn btn-primary">+ New Task</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:8px;margin-bottom:20px;">
+    <a href="{% url 'task_list' %}" class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %}">All</a>
+    {% for key, label in status_choices %}
+        <a href="?status={{ key }}" class="btn btn-sm {% if status_filter == key %}btn-primary{% else %}btn-secondary{% endif %}">{{ label }}</a>
+    {% endfor %}
+</div>
+
+<div class="card" style="padding:0;">
+    {% if tasks %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Due</th><th>Title</th><th>Priority</th><th>Status</th><th>Contact</th><th>Deal</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td>
+                            <span class="due-dot due-{{ task.due_status }}"></span>
+                            {{ task.due_date|default:"-" }}
+                        </td>
+                        <td><strong>{{ task.title }}</strong>
+                            {% if task.description %}<br><small style="color:var(--text-muted);">{{ task.description|truncatechars:60 }}</small>{% endif %}
+                        </td>
+                        <td><span class="badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span></td>
+                        <td>{{ task.get_status_display }}</td>
+                        <td>{% if task.contact %}<a href="{% url 'contact_detail' task.contact.pk %}">{{ task.contact.full_name }}</a>{% else %}-{% endif %}</td>
+                        <td>{% if task.deal %}<a href="{% url 'deal_detail' task.deal.pk %}">{{ task.deal }}</a>{% else %}-{% endif %}</td>
+                        <td>
+                            <a href="{% url 'task_edit' task.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+                            <a href="{% url 'task_delete' task.pk %}" class="btn btn-danger btn-sm">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty">
+            <p>No tasks found.</p>
+            <a href="{% url 'task_create' %}" class="btn btn-primary">Create your first task</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
